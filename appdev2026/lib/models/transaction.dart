@@ -19,6 +19,34 @@ class TransactionModel {
     required this.timestamp,
   });
 
+  // ==========================================
+  // ADDED FOR AI HACKATHON INTEGRATION
+  // Converts the Gemini JSON output into this model
+  // ==========================================
+  factory TransactionModel.fromJson(
+    Map<String, dynamic> json,
+    String generatedId,
+  ) {
+    // Grab the category the AI predicted
+    final String predictedCategory =
+        json['aiCategory']?.toString() ?? 'General';
+
+    return TransactionModel(
+      id: generatedId,
+      amount: (json['amount'] as num? ?? 0).toDouble(),
+      type: json['type']?.toString().toLowerCase() == 'income'
+          ? 'income'
+          : 'expense',
+
+      // Assign the AI's prediction to BOTH fields so it is never blank in Firebase
+      category: predictedCategory,
+      aiCategory: predictedCategory,
+
+      note: json['note']?.toString() ?? 'Quick Log',
+      timestamp: Timestamp.now(),
+    );
+  }
+
   Map<String, dynamic> toMap() {
     return {
       'amount': amount,

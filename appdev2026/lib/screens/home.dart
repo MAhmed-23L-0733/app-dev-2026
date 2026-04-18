@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import '../auth/user_profile_service.dart';
 import '../services/currency_service.dart';
 import '../models/transaction.dart';
+import '../services/ai_expense_service.dart';
 import '../services/budget_firestore_service.dart';
 import '../widgets/neon_surface.dart';
 
@@ -196,6 +197,18 @@ class HomeView extends StatelessWidget {
                                               value,
                                             );
                                       },
+                                    ),
+                                    const SizedBox(height: 12),
+                                    SizedBox(
+                                      width: double.infinity,
+                                      child: OutlinedButton.icon(
+                                        onPressed: () =>
+                                            _showAiTextLogSheet(context),
+                                        icon: const Icon(Icons.auto_awesome),
+                                        label: const Text(
+                                          'Log from text with AI',
+                                        ),
+                                      ),
                                     ),
                                     const SizedBox(height: 18),
                                     Text(
@@ -469,6 +482,133 @@ String _monthLabel(DateTime value) {
   ];
 
   return '${months[value.month - 1]} ${value.year}';
+}
+
+Future<void> _showAiTextLogSheet(BuildContext context) async {
+  await showDialog<void>(
+    context: context,
+    builder: (BuildContext dialogContext) =>
+        _AiTextLogDialog(messenger: ScaffoldMessenger.maybeOf(context)),
+  );
+}
+
+class _AiTextLogDialog extends StatefulWidget {
+  const _AiTextLogDialog({required this.messenger});
+
+  final ScaffoldMessengerState? messenger;
+
+  @override
+  State<_AiTextLogDialog> createState() => _AiTextLogDialogState();
+}
+
+class _AiTextLogDialogState extends State<_AiTextLogDialog> {
+  final TextEditingController _controller = TextEditingController();
+  bool _isSubmitting = false;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final String userInput = _controller.text.trim();
+    if (userInput.isEmpty) {
+      widget.messenger?.showSnackBar(
+        const SnackBar(content: Text('Please enter transaction text.')),
+      );
+      return;
+    }
+
+    setState(() {
+      _isSubmitting = true;
+    });
+
+    try {
+      await AiExpenseService().logExpenseFromText(userInput);
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+      widget.messenger?.showSnackBar(
+        const SnackBar(content: Text('Transaction logged with AI.')),
+      );
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+      }
+      widget.messenger?.showSnackBar(
+        SnackBar(content: Text('AI log failed: $error')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final Color onSurface = Theme.of(context).colorScheme.onSurface;
+    return AlertDialog(
+      title: Text(
+        'Quick AI text log',
+        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+          fontWeight: FontWeight.w800,
+          color: onSurface,
+        ),
+      ),
+      content: SingleChildScrollView(
+        child: SizedBox(
+          width: 420,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              Text(
+                'Describe your transaction in one sentence.',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: onSurface.withOpacity(0.72),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _controller,
+                maxLines: 3,
+                textInputAction: TextInputAction.done,
+                decoration: const InputDecoration(
+                  hintText: 'Paid 1500 PKR for groceries at Imtiaz',
+                ),
+                onSubmitted: (_) {
+                  if (!_isSubmitting) {
+                    _submit();
+                  }
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: <Widget>[
+        TextButton(
+          onPressed: _isSubmitting
+              ? null
+              : () {
+                  Navigator.of(context).pop();
+                },
+          child: const Text('Cancel'),
+        ),
+        FilledButton.icon(
+          onPressed: _isSubmitting ? null : _submit,
+          icon: _isSubmitting
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.send_rounded),
+          label: Text(_isSubmitting ? 'Logging...' : 'Log transaction'),
+        ),
+      ],
+    );
+  }
 }
 
 class _MetricTile extends StatelessWidget {

@@ -1,7 +1,11 @@
+import 'dart:typed_data';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../services/currency_service.dart';
+import '../services/ai_expense_service.dart';
 import '../services/budget_firestore_service.dart';
 import '../widgets/neon_surface.dart';
 
@@ -17,8 +21,10 @@ class _AddTransactionViewState extends State<AddTransactionView> {
   final TextEditingController _amountController = TextEditingController();
   final TextEditingController _noteController = TextEditingController();
   final TextEditingController _categoryController = TextEditingController();
+  final ImagePicker _imagePicker = ImagePicker();
   String _selectedType = 'expense';
   bool _isSaving = false;
+  bool _isAiUploading = false;
 
   @override
   void dispose() {
@@ -73,6 +79,100 @@ class _AddTransactionViewState extends State<AddTransactionView> {
     }
   }
 
+  Future<void> _uploadReceiptAndAutoLog() async {
+    try {
+      final XFile? picked = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 92,
+      );
+
+      if (picked == null) {
+        return;
+      }
+
+      setState(() {
+        _isAiUploading = true;
+      });
+
+      final Uint8List bytes = await picked.readAsBytes();
+      final String mimeType = _resolveMimeType(picked.name);
+
+      final Map<String, dynamic> parsed = await AiExpenseService()
+          .parseReceiptData(bytes, mimeType);
+
+      final double amount = (parsed['amount'] as num? ?? 0).toDouble();
+      final String selectedCurrencyCode =
+          CurrencyPreferenceController.instance.currentCode;
+      final String sourceCurrencyCode =
+          (parsed['sourceCurrencyCode'] as String? ?? '').trim().toUpperCase();
+      final bool hasSupportedSourceCurrency = CurrencyPreferenceController
+          .options
+          .any((CurrencyOption option) => option.code == sourceCurrencyCode);
+      final String amountCurrencyCode = hasSupportedSourceCurrency
+          ? sourceCurrencyCode
+          : selectedCurrencyCode;
+      final double convertedAmount = amount > 0
+          ? CurrencyPreferenceController.instance.fromBaseAmount(
+              CurrencyPreferenceController.instance.toBaseAmount(
+                amount,
+                amountCurrencyCode,
+              ),
+              selectedCurrencyCode,
+            )
+          : amount;
+      final String category =
+          (parsed['aiCategory'] as String?)?.trim().isNotEmpty == true
+          ? (parsed['aiCategory'] as String).trim()
+          : 'General';
+      final String note = (parsed['note'] as String?)?.trim().isNotEmpty == true
+          ? (parsed['note'] as String).trim()
+          : 'Receipt scanned with AI.';
+      final String type = parsed['type']?.toString().toLowerCase() == 'income'
+          ? 'income'
+          : 'expense';
+
+      if (mounted) {
+        setState(() {
+          _selectedType = type;
+          _amountController.text = convertedAmount > 0
+              ? convertedAmount.toStringAsFixed(2)
+              : '';
+          _categoryController.text = category;
+          _noteController.text = note;
+        });
+      }
+
+      if (!mounted) {
+        return;
+      }
+
+      _showMessage('Receipt parsed. Please review and save the transaction.');
+    } catch (_) {
+      _showMessage('Could not process receipt image right now.');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isAiUploading = false;
+        });
+      }
+    }
+  }
+
+  String _resolveMimeType(String filename) {
+    final String value = filename.toLowerCase();
+    if (value.endsWith('.png')) {
+      return 'image/png';
+    }
+    if (value.endsWith('.webp')) {
+      return 'image/webp';
+    }
+    if (value.endsWith('.gif')) {
+      return 'image/gif';
+    }
+
+    return 'image/jpeg';
+  }
+
   void _showMessage(String message) {
     ScaffoldMessenger.of(
       context,
@@ -111,6 +211,24 @@ class _AddTransactionViewState extends State<AddTransactionView> {
                       'Track every income and expense so your monthly totals stay live.',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: onSurface.withOpacity(0.7),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    OutlinedButton.icon(
+                      onPressed: (_isAiUploading || _isSaving)
+                          ? null
+                          : _uploadReceiptAndAutoLog,
+                      icon: _isAiUploading
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.receipt_long_rounded),
+                      label: Text(
+                        _isAiUploading
+                            ? 'Processing receipt...'
+                            : 'Upload Receipt with AI (Auto Fill)',
                       ),
                     ),
                     const SizedBox(height: 20),
