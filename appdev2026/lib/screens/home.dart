@@ -17,6 +17,13 @@ class HomeView extends StatelessWidget {
   Widget build(BuildContext context) {
     final User? user = FirebaseAuth.instance.currentUser;
     final Color onSurface = Theme.of(context).colorScheme.onSurface;
+    final bool isCompactScreen = MediaQuery.sizeOf(context).width < 380;
+    final EdgeInsets contentPadding = EdgeInsets.fromLTRB(
+      isCompactScreen ? 16 : 20,
+      12,
+      isCompactScreen ? 16 : 20,
+      isCompactScreen ? 104 : 120,
+    );
 
     if (user == null) {
       return Center(
@@ -88,7 +95,7 @@ class HomeView extends StatelessWidget {
                         final double balanceBase = incomeTotal - expenseTotal;
 
                         return SingleChildScrollView(
-                          padding: const EdgeInsets.fromLTRB(20, 12, 20, 120),
+                          padding: contentPadding,
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: <Widget>[
@@ -99,8 +106,8 @@ class HomeView extends StatelessWidget {
                                     Row(
                                       children: <Widget>[
                                         Container(
-                                          width: 58,
-                                          height: 58,
+                                          width: isCompactScreen ? 50 : 58,
+                                          height: isCompactScreen ? 50 : 58,
                                           decoration: BoxDecoration(
                                             shape: BoxShape.circle,
                                             gradient: LinearGradient(
@@ -115,14 +122,18 @@ class HomeView extends StatelessWidget {
                                           alignment: Alignment.center,
                                           child: Text(
                                             _initials(user),
-                                            style: const TextStyle(
+                                            style: TextStyle(
                                               color: Colors.white,
-                                              fontSize: 20,
+                                              fontSize: isCompactScreen
+                                                  ? 17
+                                                  : 20,
                                               fontWeight: FontWeight.w800,
                                             ),
                                           ),
                                         ),
-                                        const SizedBox(width: 14),
+                                        SizedBox(
+                                          width: isCompactScreen ? 10 : 14,
+                                        ),
                                         Expanded(
                                           child: Column(
                                             crossAxisAlignment:
@@ -150,59 +161,41 @@ class HomeView extends StatelessWidget {
                                                           .withOpacity(0.74),
                                                     ),
                                               ),
-                                              const SizedBox(height: 12),
-                                              Align(
-                                                alignment: Alignment.centerLeft,
-                                                child: SizedBox(
-                                                  width: 220,
-                                                  child: DropdownButtonFormField<String>(
-                                                    value: currencyCode,
-                                                    decoration:
-                                                        const InputDecoration(
-                                                          labelText:
-                                                              'Currency converter',
-                                                          prefixIcon: Icon(
-                                                            Icons
-                                                                .payments_rounded,
-                                                          ),
-                                                        ),
-                                                    items: CurrencyPreferenceController
-                                                        .options
-                                                        .map(
-                                                          (
-                                                            CurrencyOption
-                                                            option,
-                                                          ) =>
-                                                              DropdownMenuItem<
-                                                                String
-                                                              >(
-                                                                value:
-                                                                    option.code,
-                                                                child: Text(
-                                                                  option.label,
-                                                                ),
-                                                              ),
-                                                        )
-                                                        .toList(),
-                                                    onChanged: (String? value) {
-                                                      if (value == null) {
-                                                        return;
-                                                      }
-
-                                                      UserProfileService
-                                                          .instance
-                                                          .updatePreferredCurrency(
-                                                            user,
-                                                            value,
-                                                          );
-                                                    },
-                                                  ),
-                                                ),
-                                              ),
                                             ],
                                           ),
                                         ),
                                       ],
+                                    ),
+                                    const SizedBox(height: 14),
+                                    DropdownButtonFormField<String>(
+                                      value: currencyCode,
+                                      decoration: const InputDecoration(
+                                        labelText: 'Currency converter',
+                                        prefixIcon: Icon(
+                                          Icons.payments_rounded,
+                                        ),
+                                      ),
+                                      items: CurrencyPreferenceController
+                                          .options
+                                          .map(
+                                            (CurrencyOption option) =>
+                                                DropdownMenuItem<String>(
+                                                  value: option.code,
+                                                  child: Text(option.label),
+                                                ),
+                                          )
+                                          .toList(),
+                                      onChanged: (String? value) {
+                                        if (value == null) {
+                                          return;
+                                        }
+
+                                        UserProfileService.instance
+                                            .updatePreferredCurrency(
+                                              user,
+                                              value,
+                                            );
+                                      },
                                     ),
                                     const SizedBox(height: 18),
                                     Text(

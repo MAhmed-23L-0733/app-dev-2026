@@ -6,7 +6,7 @@ class SpendWiseLogo extends StatelessWidget {
 
   const SpendWiseLogo({
     super.key,
-    this.fontSize = 42.0, // Default large size for prominence
+    this.fontSize = 52.0, // Default large size for prominence
   });
 
   @override

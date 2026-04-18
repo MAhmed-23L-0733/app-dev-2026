@@ -12,6 +12,7 @@ class ProfileView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final User? user = FirebaseAuth.instance.currentUser;
+    final bool isCompactScreen = MediaQuery.sizeOf(context).width < 380;
     final String name = _displayName(user);
     final String email = user?.email ?? 'No email linked';
     final String provider = _providerLabel(user);
@@ -53,9 +54,9 @@ class ProfileView extends StatelessWidget {
                           )
                         : Text(
                             _initials(user),
-                            style: const TextStyle(
+                            style: TextStyle(
                               color: Colors.white,
-                              fontSize: 26,
+                              fontSize: isCompactScreen ? 22 : 26,
                               fontWeight: FontWeight.w800,
                             ),
                           ),

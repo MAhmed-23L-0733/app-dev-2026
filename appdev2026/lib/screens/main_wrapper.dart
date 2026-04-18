@@ -9,6 +9,7 @@ import 'home.dart';
 import 'profile.dart';
 import '../auth/user_profile_service.dart';
 import '../theme_controller.dart';
+import '../widgets/logo.dart';
 import '../widgets/neon_surface.dart';
 
 class MainWrapperScreen extends StatefulWidget {
@@ -40,18 +41,21 @@ class _MainWrapperScreenState extends State<MainWrapperScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final List<String> titles = <String>[
-      'Dashboard',
-      'Add transaction',
-      'Goals',
-      'Profile',
-    ];
+    final bool isCompactScreen = MediaQuery.sizeOf(context).width < 380;
 
     return Scaffold(
       extendBody: true,
       backgroundColor: Colors.transparent,
       appBar: AppBar(
-        title: Text(titles[_selectedIndex]),
+        automaticallyImplyLeading: false,
+        leadingWidth: isCompactScreen ? 150 : 172,
+        leading: Padding(
+          padding: EdgeInsets.only(left: 16),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: SpendWiseLogo(fontSize: isCompactScreen ? 16 : 18),
+          ),
+        ),
         actions: <Widget>[
           IconButton(
             tooltip: 'Toggle theme',

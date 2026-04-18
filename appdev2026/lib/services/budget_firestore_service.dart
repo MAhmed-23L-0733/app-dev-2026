@@ -145,6 +145,22 @@ class BudgetFirestoreService {
     required String currencyCode,
     required DateTime deadline,
   }) async {
+    final DateTime now = DateTime.now();
+    final DateTime today = DateTime(now.year, now.month, now.day);
+    final DateTime normalizedDeadline = DateTime(
+      deadline.year,
+      deadline.month,
+      deadline.day,
+    );
+
+    if (normalizedDeadline.isBefore(today)) {
+      throw FirebaseException(
+        plugin: 'cloud_firestore',
+        code: 'invalid-deadline',
+        message: 'Deadline cannot be older than today.',
+      );
+    }
+
     final double targetInBase = CurrencyPreferenceController.instance
         .toBaseAmount(targetAmount, currencyCode);
 
@@ -198,7 +214,13 @@ class BudgetFirestoreService {
           .toDouble();
       final double targetAmount = (goalData['targetAmount'] as num? ?? 0)
           .toDouble();
-      final double netTotal = (summaryData['netTotal'] as num? ?? 0).toDouble();
+      final double incomeTotal = (summaryData['incomeTotal'] as num? ?? 0)
+          .toDouble();
+      final double expenseTotal = (summaryData['expenseTotal'] as num? ?? 0)
+          .toDouble();
+      final double netTotal =
+          (summaryData['netTotal'] as num?)?.toDouble() ??
+          (incomeTotal - expenseTotal);
 
       if (amountInBase <= 0) {
         throw FirebaseException(

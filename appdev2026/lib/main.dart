@@ -2,7 +2,6 @@
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'auth/signin.dart';
 import 'auth/signup.dart';
 import 'firebase_options.dart';
@@ -27,6 +26,23 @@ class MyApp extends StatelessWidget {
         return MaterialApp(
           debugShowCheckedModeBanner: false,
           title: 'Hackathon Firebase App',
+          builder: (BuildContext context, Widget? child) {
+            final MediaQueryData mediaQuery = MediaQuery.of(context);
+            final bool isPhone = mediaQuery.size.width < 420;
+            final double systemScale = mediaQuery.textScaler.scale(1);
+            final double responsiveScale = isPhone ? 0.94 : 1.0;
+            final double clampedScale = (systemScale * responsiveScale).clamp(
+              0.85,
+              1.05,
+            );
+
+            return MediaQuery(
+              data: mediaQuery.copyWith(
+                textScaler: TextScaler.linear(clampedScale),
+              ),
+              child: child ?? const SizedBox.shrink(),
+            );
+          },
           themeMode: themeMode,
           theme: _buildTheme(Brightness.light),
           darkTheme: _buildTheme(Brightness.dark),
@@ -44,6 +60,11 @@ class MyApp extends StatelessWidget {
 
 ThemeData _buildTheme(Brightness brightness) {
   final bool isDark = brightness == Brightness.dark;
+  final TextTheme baseTextTheme = ThemeData(
+    useMaterial3: true,
+    brightness: brightness,
+  ).textTheme;
+  final TextTheme textTheme = _responsiveTextTheme(baseTextTheme);
 
   // Clean Black and White surfaces
   final Color surface = isDark
@@ -94,6 +115,7 @@ ThemeData _buildTheme(Brightness brightness) {
     useMaterial3: true,
     brightness: brightness,
     colorScheme: colorScheme,
+    textTheme: textTheme,
     scaffoldBackgroundColor: Colors.transparent,
     appBarTheme: AppBarTheme(
       backgroundColor: appBarBackground,
@@ -102,9 +124,8 @@ ThemeData _buildTheme(Brightness brightness) {
       elevation: 0,
       scrolledUnderElevation: 0,
       surfaceTintColor: Colors.transparent,
-      titleTextStyle: TextStyle(
+      titleTextStyle: textTheme.titleLarge?.copyWith(
         color: onSurface,
-        fontSize: 20,
         fontWeight: FontWeight.w700,
       ),
       iconTheme: IconThemeData(color: onSurface),
@@ -121,7 +142,7 @@ ThemeData _buildTheme(Brightness brightness) {
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: fieldBackground,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       labelStyle: TextStyle(color: onSurface.withOpacity(0.72)),
       hintStyle: TextStyle(color: onSurface.withOpacity(0.46)),
       prefixIconColor: primary,
@@ -147,10 +168,10 @@ ThemeData _buildTheme(Brightness brightness) {
       style: ElevatedButton.styleFrom(
         backgroundColor: primary,
         foregroundColor: Colors.white,
-        minimumSize: const Size.fromHeight(56),
+        minimumSize: const Size.fromHeight(52),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
         elevation: 0,
-        textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+        textStyle: textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
       ),
     ),
     textButtonTheme: TextButtonThemeData(
@@ -165,8 +186,12 @@ ThemeData _buildTheme(Brightness brightness) {
       selectedItemColor: primary,
       unselectedItemColor: onSurface.withOpacity(0.58),
       showSelectedLabels: true,
-      showUnselectedLabels: true,
+      showUnselectedLabels: false,
       type: BottomNavigationBarType.fixed,
+      selectedLabelStyle: textTheme.labelSmall?.copyWith(
+        fontWeight: FontWeight.w700,
+      ),
+      unselectedLabelStyle: textTheme.labelSmall,
     ),
     dividerTheme: DividerThemeData(
       color: primary.withOpacity(0.12),
@@ -178,5 +203,25 @@ ThemeData _buildTheme(Brightness brightness) {
       behavior: SnackBarBehavior.floating,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
     ),
+  );
+}
+
+TextTheme _responsiveTextTheme(TextTheme base) {
+  return base.copyWith(
+    displayLarge: base.displayLarge?.copyWith(fontSize: 46),
+    displayMedium: base.displayMedium?.copyWith(fontSize: 39),
+    displaySmall: base.displaySmall?.copyWith(fontSize: 32),
+    headlineLarge: base.headlineLarge?.copyWith(fontSize: 29),
+    headlineMedium: base.headlineMedium?.copyWith(fontSize: 24),
+    headlineSmall: base.headlineSmall?.copyWith(fontSize: 21),
+    titleLarge: base.titleLarge?.copyWith(fontSize: 19),
+    titleMedium: base.titleMedium?.copyWith(fontSize: 16),
+    titleSmall: base.titleSmall?.copyWith(fontSize: 14),
+    bodyLarge: base.bodyLarge?.copyWith(fontSize: 15),
+    bodyMedium: base.bodyMedium?.copyWith(fontSize: 14),
+    bodySmall: base.bodySmall?.copyWith(fontSize: 12),
+    labelLarge: base.labelLarge?.copyWith(fontSize: 14),
+    labelMedium: base.labelMedium?.copyWith(fontSize: 12),
+    labelSmall: base.labelSmall?.copyWith(fontSize: 11),
   );
 }

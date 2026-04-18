@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../models/goal.dart';
+import '../models/transaction.dart';
 import '../services/budget_firestore_service.dart';
 import '../services/currency_service.dart';
 import '../widgets/neon_surface.dart';
@@ -31,21 +32,24 @@ class _GoalsViewState extends State<GoalsView> {
 
   Future<void> _pickDeadline() async {
     final DateTime now = DateTime.now();
-    final DateTime minimumDate = DateTime(
-      now.year,
-      now.month,
-      now.day,
-    ).add(const Duration(days: 1));
+    final DateTime minimumDate = DateTime(now.year, now.month, now.day);
+    final DateTime? selectedDeadline = _deadline;
+    final DateTime normalizedSelectedDeadline = selectedDeadline == null
+        ? minimumDate.add(const Duration(days: 30))
+        : _startOfDay(selectedDeadline);
     final DateTime initialDate =
-        _deadline ?? minimumDate.add(const Duration(days: 30));
+        normalizedSelectedDeadline.isBefore(minimumDate)
+        ? minimumDate
+        : normalizedSelectedDeadline;
 
     final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: initialDate.isBefore(minimumDate)
-          ? minimumDate
-          : initialDate,
+      initialDate: initialDate,
       firstDate: minimumDate,
       lastDate: DateTime(now.year + 10),
+      selectableDayPredicate: (DateTime day) {
+        return !_startOfDay(day).isBefore(minimumDate);
+      },
     );
 
     if (picked == null) {
@@ -75,8 +79,9 @@ class _GoalsViewState extends State<GoalsView> {
       return;
     }
 
-    if (!deadline.isAfter(DateTime.now())) {
-      _showMessage('Deadline must be a future date.');
+    final DateTime today = _startOfDay(DateTime.now());
+    if (_startOfDay(deadline).isBefore(today)) {
+      _showMessage('Deadline cannot be older than today.');
       return;
     }
 
@@ -102,7 +107,7 @@ class _GoalsViewState extends State<GoalsView> {
         return;
       }
 
-      _showMessage('Goal saved to Firebase.');
+      _showMessage('Goal saved.');
     } catch (_) {
       _showMessage('Unable to save the goal right now.');
     } finally {
@@ -139,182 +144,229 @@ class _GoalsViewState extends State<GoalsView> {
     return ValueListenableBuilder<String>(
       valueListenable: CurrencyPreferenceController.instance.currencyCode,
       builder: (BuildContext context, String currencyCode, _) {
-        return StreamBuilder<double>(
-          stream: BudgetFirestoreService.instance
-              .watchMonthlySummary(user)
-              .map(
-                (snapshot) =>
-                    (snapshot.data()?['netTotal'] as num? ?? 0).toDouble(),
-              ),
-          builder: (BuildContext context, AsyncSnapshot<double> netSnapshot) {
-            final double availableNetBase = netSnapshot.data ?? 0.0;
-            final double availableNetDisplay = CurrencyPreferenceController
-                .instance
-                .fromBaseAmount(availableNetBase, currencyCode);
+        return StreamBuilder<List<TransactionModel>>(
+          stream: BudgetFirestoreService.instance.watchCurrentMonthTransactions(
+            user,
+          ),
+          builder:
+              (
+                BuildContext context,
+                AsyncSnapshot<List<TransactionModel>> transactionsSnapshot,
+              ) {
+                final List<TransactionModel> transactions =
+                    transactionsSnapshot.data ?? <TransactionModel>[];
+                final double incomeTotal = transactions
+                    .where(
+                      (TransactionModel transaction) =>
+                          transaction.type == 'income',
+                    )
+                    .fold<double>(
+                      0,
+                      (double total, TransactionModel transaction) =>
+                          total + transaction.amount,
+                    );
+                final double expenseTotal = transactions
+                    .where(
+                      (TransactionModel transaction) =>
+                          transaction.type != 'income',
+                    )
+                    .fold<double>(
+                      0,
+                      (double total, TransactionModel transaction) =>
+                          total + transaction.amount,
+                    );
+                final double availableNetBase = incomeTotal - expenseTotal;
+                final double availableNetDisplay = CurrencyPreferenceController
+                    .instance
+                    .fromBaseAmount(availableNetBase, currencyCode);
 
-            return StreamBuilder<List<GoalModel>>(
-              stream: BudgetFirestoreService.instance.watchGoals(user),
-              builder: (BuildContext context, AsyncSnapshot<List<GoalModel>> snapshot) {
-                final List<GoalModel> goals = snapshot.data ?? <GoalModel>[];
+                return StreamBuilder<List<GoalModel>>(
+                  stream: BudgetFirestoreService.instance.watchGoals(user),
+                  builder: (BuildContext context, AsyncSnapshot<List<GoalModel>> snapshot) {
+                    final List<GoalModel> goals =
+                        snapshot.data ?? <GoalModel>[];
 
-                return SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 120),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: <Widget>[
-                      GlassCard(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: <Widget>[
-                            Text(
-                              'Goals',
-                              style: Theme.of(context).textTheme.headlineSmall
-                                  ?.copyWith(
-                                    fontWeight: FontWeight.w800,
-                                    color: onSurface,
-                                  ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Set clear targets and track them alongside your monthly budget.',
-                              style: Theme.of(context).textTheme.bodyMedium
-                                  ?.copyWith(color: onSurface.withOpacity(0.7)),
-                            ),
-                            const SizedBox(height: 20),
-                            Form(
-                              key: _formKey,
-                              child: Column(
-                                children: <Widget>[
-                                  TextFormField(
-                                    controller: _titleController,
-                                    textCapitalization:
-                                        TextCapitalization.words,
-                                    decoration: const InputDecoration(
-                                      labelText: 'Goal title',
-                                      prefixIcon: Icon(Icons.flag_rounded),
-                                    ),
-                                    validator: (String? value) {
-                                      if ((value ?? '').trim().isEmpty) {
-                                        return 'Enter a goal title.';
-                                      }
-                                      return null;
-                                    },
-                                  ),
-                                  const SizedBox(height: 16),
-                                  TextFormField(
-                                    controller: _targetController,
-                                    keyboardType:
-                                        const TextInputType.numberWithOptions(
-                                          decimal: true,
-                                        ),
-                                    decoration: InputDecoration(
-                                      labelText:
-                                          'Target amount ($currencyCode)',
-                                      prefixText:
-                                          '${CurrencyPreferenceController.instance.optionFor(currencyCode).symbol} ',
-                                      prefixIcon: const Icon(
-                                        Icons.savings_rounded,
+                    return SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(20, 12, 20, 120),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: <Widget>[
+                          GlassCard(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: <Widget>[
+                                Text(
+                                  'Goals',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .headlineSmall
+                                      ?.copyWith(
+                                        fontWeight: FontWeight.w800,
+                                        color: onSurface,
                                       ),
-                                    ),
-                                    validator: (String? value) {
-                                      final double? amount = double.tryParse(
-                                        value?.trim() ?? '',
-                                      );
-                                      if (amount == null || amount <= 0) {
-                                        return 'Enter a valid target amount.';
-                                      }
-                                      return null;
-                                    },
-                                  ),
-                                  const SizedBox(height: 16),
-                                  TextFormField(
-                                    controller: _deadlineController,
-                                    readOnly: true,
-                                    onTap: _pickDeadline,
-                                    decoration: const InputDecoration(
-                                      labelText: 'Deadline',
-                                      prefixIcon: Icon(Icons.event_rounded),
-                                    ),
-                                    validator: (String? value) {
-                                      if (_deadline == null) {
-                                        return 'Choose a deadline.';
-                                      }
-                                      return null;
-                                    },
-                                  ),
-                                  const SizedBox(height: 20),
-                                  ElevatedButton.icon(
-                                    onPressed: _isSaving
-                                        ? null
-                                        : () => _saveGoal(currencyCode),
-                                    icon: const Icon(Icons.add_task_rounded),
-                                    label: Text(
-                                      _isSaving ? 'Saving...' : 'Save goal',
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      GlassCard(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: <Widget>[
-                            Text(
-                              'Saved goals',
-                              style: Theme.of(context).textTheme.titleLarge
-                                  ?.copyWith(
-                                    fontWeight: FontWeight.w800,
-                                    color: onSurface,
-                                  ),
-                            ),
-                            const SizedBox(height: 14),
-                            if (snapshot.connectionState ==
-                                ConnectionState.waiting)
-                              const Center(
-                                child: Padding(
-                                  padding: EdgeInsets.symmetric(vertical: 24),
-                                  child: CircularProgressIndicator(),
                                 ),
-                              )
-                            else if (goals.isEmpty)
-                              Text(
-                                'No goals yet. Add one to start tracking progress.',
-                                style: Theme.of(context).textTheme.bodyMedium
-                                    ?.copyWith(
-                                      color: onSurface.withOpacity(0.7),
-                                    ),
-                              )
-                            else
-                              Column(
-                                children: goals
-                                    .map(
-                                      (GoalModel goal) => Padding(
-                                        padding: const EdgeInsets.only(
-                                          bottom: 12,
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Set clear targets and track them alongside your monthly budget.',
+                                  style: Theme.of(context).textTheme.bodyMedium
+                                      ?.copyWith(
+                                        color: onSurface.withOpacity(0.7),
+                                      ),
+                                ),
+                                const SizedBox(height: 20),
+                                Form(
+                                  key: _formKey,
+                                  child: Column(
+                                    children: <Widget>[
+                                      TextFormField(
+                                        controller: _titleController,
+                                        textCapitalization:
+                                            TextCapitalization.words,
+                                        decoration: const InputDecoration(
+                                          labelText: 'Goal title',
+                                          prefixIcon: Icon(Icons.flag_rounded),
                                         ),
-                                        child: _GoalCard(
-                                          goal: goal,
-                                          availableNetDisplay:
-                                              availableNetDisplay,
-                                          currencyCode: currencyCode,
+                                        validator: (String? value) {
+                                          if ((value ?? '').trim().isEmpty) {
+                                            return 'Enter a goal title.';
+                                          }
+                                          return null;
+                                        },
+                                      ),
+                                      const SizedBox(height: 16),
+                                      TextFormField(
+                                        controller: _targetController,
+                                        keyboardType:
+                                            const TextInputType.numberWithOptions(
+                                              decimal: true,
+                                            ),
+                                        decoration: InputDecoration(
+                                          labelText:
+                                              'Target amount ($currencyCode)',
+                                          prefixText:
+                                              '${CurrencyPreferenceController.instance.optionFor(currencyCode).symbol} ',
+                                          prefixIcon: const Icon(
+                                            Icons.savings_rounded,
+                                          ),
+                                        ),
+                                        validator: (String? value) {
+                                          final double? amount =
+                                              double.tryParse(
+                                                value?.trim() ?? '',
+                                              );
+                                          if (amount == null || amount <= 0) {
+                                            return 'Enter a valid target amount.';
+                                          }
+                                          return null;
+                                        },
+                                      ),
+                                      const SizedBox(height: 16),
+                                      TextFormField(
+                                        controller: _deadlineController,
+                                        readOnly: true,
+                                        onTap: _pickDeadline,
+                                        decoration: const InputDecoration(
+                                          labelText: 'Deadline',
+                                          prefixIcon: Icon(Icons.event_rounded),
+                                        ),
+                                        validator: (String? value) {
+                                          if (_deadline == null) {
+                                            return 'Choose a deadline.';
+                                          }
+
+                                          final DateTime today = _startOfDay(
+                                            DateTime.now(),
+                                          );
+                                          if (_startOfDay(
+                                            _deadline!,
+                                          ).isBefore(today)) {
+                                            return 'Deadline cannot be older than today.';
+                                          }
+
+                                          return null;
+                                        },
+                                      ),
+                                      const SizedBox(height: 20),
+                                      ElevatedButton.icon(
+                                        onPressed: _isSaving
+                                            ? null
+                                            : () => _saveGoal(currencyCode),
+                                        icon: const Icon(
+                                          Icons.add_task_rounded,
+                                        ),
+                                        label: Text(
+                                          _isSaving ? 'Saving...' : 'Save goal',
                                         ),
                                       ),
-                                    )
-                                    .toList(),
-                              ),
-                          ],
-                        ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          GlassCard(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: <Widget>[
+                                Text(
+                                  'Saved goals',
+                                  style: Theme.of(context).textTheme.titleLarge
+                                      ?.copyWith(
+                                        fontWeight: FontWeight.w800,
+                                        color: onSurface,
+                                      ),
+                                ),
+                                const SizedBox(height: 14),
+                                if (snapshot.connectionState ==
+                                    ConnectionState.waiting)
+                                  const Center(
+                                    child: Padding(
+                                      padding: EdgeInsets.symmetric(
+                                        vertical: 24,
+                                      ),
+                                      child: CircularProgressIndicator(),
+                                    ),
+                                  )
+                                else if (goals.isEmpty)
+                                  Text(
+                                    'No goals yet. Add one to start tracking progress.',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodyMedium
+                                        ?.copyWith(
+                                          color: onSurface.withOpacity(0.7),
+                                        ),
+                                  )
+                                else
+                                  Column(
+                                    children: goals
+                                        .map(
+                                          (GoalModel goal) => Padding(
+                                            padding: const EdgeInsets.only(
+                                              bottom: 12,
+                                            ),
+                                            child: _GoalCard(
+                                              goal: goal,
+                                              availableNetBase:
+                                                  availableNetBase,
+                                              availableNetDisplay:
+                                                  availableNetDisplay,
+                                              currencyCode: currencyCode,
+                                            ),
+                                          ),
+                                        )
+                                        .toList(),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
+                    );
+                  },
                 );
               },
-            );
-          },
         );
       },
     );
@@ -324,11 +376,13 @@ class _GoalsViewState extends State<GoalsView> {
 class _GoalCard extends StatelessWidget {
   const _GoalCard({
     required this.goal,
+    required this.availableNetBase,
     required this.availableNetDisplay,
     required this.currencyCode,
   });
 
   final GoalModel goal;
+  final double availableNetBase;
   final double availableNetDisplay;
   final String currencyCode;
 
@@ -338,13 +392,16 @@ class _GoalCard extends StatelessWidget {
     bool isSaving = false;
 
     Future<void> submit(StateSetter setState) async {
+      final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+      final NavigatorState navigator = Navigator.of(context);
+
       if (!(formKey.currentState?.validate() ?? false)) {
         return;
       }
 
       final User? user = FirebaseAuth.instance.currentUser;
       if (user == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        messenger.showSnackBar(
           const SnackBar(content: Text('Sign in again to continue.')),
         );
         return;
@@ -363,22 +420,22 @@ class _GoalCard extends StatelessWidget {
           currencyCode: currencyCode,
         );
 
-        if (context.mounted) {
-          Navigator.of(context).pop();
-          ScaffoldMessenger.of(context).showSnackBar(
+        if (navigator.mounted && messenger.mounted) {
+          navigator.pop();
+          messenger.showSnackBar(
             const SnackBar(content: Text('Goal progress updated.')),
           );
         }
       } on FirebaseException catch (error) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        messenger.showSnackBar(
           SnackBar(content: Text(error.message ?? 'Unable to update goal.')),
         );
       } catch (_) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Unable to update goal.')));
+        messenger.showSnackBar(
+          const SnackBar(content: Text('Unable to update goal.')),
+        );
       } finally {
-        if (context.mounted) {
+        if (navigator.mounted) {
           setState(() {
             isSaving = false;
           });
@@ -389,11 +446,7 @@ class _GoalCard extends StatelessWidget {
     await showDialog<void>(
       context: context,
       builder: (BuildContext dialogContext) {
-        final double remainingDisplay = CurrencyPreferenceController.instance
-            .fromBaseAmount(
-              goal.targetAmount - goal.currentAmount,
-              currencyCode,
-            );
+        final double remainingBase = goal.targetAmount - goal.currentAmount;
 
         return StatefulBuilder(
           builder: (BuildContext context, StateSetter setState) {
@@ -419,10 +472,15 @@ class _GoalCard extends StatelessWidget {
                     if (amount == null || amount <= 0) {
                       return 'Enter a valid amount.';
                     }
-                    if (amount > availableNetDisplay) {
+                    final double enteredAmountBase =
+                        CurrencyPreferenceController.instance.toBaseAmount(
+                          amount,
+                          currencyCode,
+                        );
+                    if (enteredAmountBase > availableNetBase + 0.000001) {
                       return 'Amount is greater than the current net value.';
                     }
-                    if (amount > remainingDisplay) {
+                    if (enteredAmountBase > remainingBase + 0.000001) {
                       return 'Amount is greater than the remaining target.';
                     }
                     return null;
@@ -564,4 +622,8 @@ String _formatDate(DateTime value) {
   ];
 
   return '${months[value.month - 1]} ${value.day}, ${value.year}';
+}
+
+DateTime _startOfDay(DateTime value) {
+  return DateTime(value.year, value.month, value.day);
 }
