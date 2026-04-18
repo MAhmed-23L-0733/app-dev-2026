@@ -10,6 +10,9 @@ import 'budget_firestore_service.dart';
 import '../controllers/currency_controllers.dart';
 
 class AiExpenseService {
+  static bool _isLoggingTransaction = false;
+  static bool _isParsingReceipt = false;
+
   String get _apiKey {
     final String? key = dotenv.env['GEMINI_API_KEY'];
     if (key == null || key.isEmpty) {
@@ -70,18 +73,26 @@ class AiExpenseService {
   // 3. Shared Logic for Gemini & Firestore
   // ==========================================
   Future<void> _processAndSave(List<Content> content, {String? rawText}) async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      throw Exception('User must be signed in.');
+    if (_isLoggingTransaction) {
+      throw Exception('Please wait for the current AI request to finish.');
     }
 
-    final model = GenerativeModel(
-      model: 'gemini-2.5-flash',
-      apiKey: _apiKey,
-      generationConfig: GenerationConfig(responseMimeType: 'application/json'),
-    );
+    _isLoggingTransaction = true;
 
     try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        throw Exception('User must be signed in.');
+      }
+
+      final model = GenerativeModel(
+        model: 'gemini-2.5-flash',
+        apiKey: _apiKey,
+        generationConfig: GenerationConfig(
+          responseMimeType: 'application/json',
+        ),
+      );
+
       final response = await model.generateContent(content);
       String? responseText = response.text;
 
@@ -131,6 +142,8 @@ class AiExpenseService {
     } catch (e) {
       print('🔥 FATAL AI ERROR: $e');
       throw Exception(e.toString());
+    } finally {
+      _isLoggingTransaction = false;
     }
   }
 
@@ -141,32 +154,44 @@ class AiExpenseService {
     Uint8List imageBytes,
     String mimeType,
   ) async {
-    final String selectedCurrency =
-        CurrencyPreferenceController.instance.currentCode;
-    final model = GenerativeModel(
-      model: 'gemini-2.5-flash',
-      apiKey: _apiKey,
-      generationConfig: GenerationConfig(responseMimeType: 'application/json'),
-    );
-
-    final response = await model.generateContent([
-      Content.multi([
-        TextPart(
-          '$_systemPrompt\n\nSelected Currency: "$selectedCurrency"\n\nFor this parsing call, make "note" a detailed but concise description (about 1-2 sentences) including merchant, likely purchased items/services, and useful context for transaction history.',
-        ),
-        DataPart(mimeType, imageBytes),
-      ]),
-    ]);
-
-    String? responseText = response.text;
-    if (responseText != null) {
-      responseText = responseText
-          .replaceAll('```json', '')
-          .replaceAll('```', '')
-          .trim();
-      return jsonDecode(responseText);
+    if (_isParsingReceipt) {
+      throw Exception('Please wait for the current receipt scan to finish.');
     }
-    throw Exception('AI returned an empty response.');
+
+    _isParsingReceipt = true;
+
+    try {
+      final String selectedCurrency =
+          CurrencyPreferenceController.instance.currentCode;
+      final model = GenerativeModel(
+        model: 'gemini-2.5-flash',
+        apiKey: _apiKey,
+        generationConfig: GenerationConfig(
+          responseMimeType: 'application/json',
+        ),
+      );
+
+      final response = await model.generateContent([
+        Content.multi([
+          TextPart(
+            '$_systemPrompt\n\nSelected Currency: "$selectedCurrency"\n\nFor this parsing call, make "note" a detailed but concise description (about 1-2 sentences) including merchant, likely purchased items/services, and useful context for transaction history.',
+          ),
+          DataPart(mimeType, imageBytes),
+        ]),
+      ]);
+
+      String? responseText = response.text;
+      if (responseText != null) {
+        responseText = responseText
+            .replaceAll('```json', '')
+            .replaceAll('```', '')
+            .trim();
+        return jsonDecode(responseText);
+      }
+      throw Exception('AI returned an empty response.');
+    } finally {
+      _isParsingReceipt = false;
+    }
   }
 
   bool _isSupportedCurrency(String code) {

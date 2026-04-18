@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import '../services/ai_chat_service.dart';
 import '../widgets/neon_surface.dart';
@@ -20,6 +22,7 @@ class _ChatViewState extends State<ChatView> {
   final TextEditingController _controller = TextEditingController();
   final List<ChatMessage> _messages = [];
   bool _isLoading = false;
+  DateTime? _lastSubmitAt;
 
   @override
   void initState() {
@@ -30,11 +33,26 @@ class _ChatViewState extends State<ChatView> {
         false,
       ),
     );
+
+    unawaited(_chatService.initializeChat());
+    unawaited(_chatService.testConnection());
   }
 
   Future<void> _sendMessage() async {
+    if (_isLoading) {
+      return;
+    }
+
+    final DateTime now = DateTime.now();
+    if (_lastSubmitAt != null &&
+        now.difference(_lastSubmitAt!).inMilliseconds < 500) {
+      return;
+    }
+
     final text = _controller.text.trim();
     if (text.isEmpty) return;
+
+    _lastSubmitAt = now;
 
     setState(() {
       _messages.add(ChatMessage(text, true));
