@@ -234,9 +234,15 @@ class BudgetFirestoreService {
   }) async {
     final double amountInBase = CurrencyPreferenceController.instance
         .toBaseAmount(amount, currencyCode);
+    final DateTime now = DateTime.now();
+    final String monthKey = _monthKey(now);
     final DocumentReference<Map<String, dynamic>> goalRef = _goals(
       user,
     ).doc(goalId);
+    final DocumentReference<Map<String, dynamic>> transactionRef =
+        _transactions(user).doc();
+    final DocumentReference<Map<String, dynamic>> summaryRef =
+        _monthlySummaries(user).doc(monthKey);
     final double netTotal = await getCurrentMonthNetTotal(user);
 
     if (amountInBase > netTotal) {
@@ -255,6 +261,7 @@ class BudgetFirestoreService {
 
       final Map<String, dynamic> goalData =
           goalSnapshot.data() ?? <String, dynamic>{};
+      final String goalTitle = (goalData['title'] as String? ?? '').trim();
 
       final double currentAmount = (goalData['currentAmount'] as num? ?? 0)
           .toDouble();
@@ -285,6 +292,27 @@ class BudgetFirestoreService {
           message: 'Savings amount is greater than the remaining target.',
         );
       }
+
+      transaction.set(transactionRef, <String, dynamic>{
+        'amount': amountInBase,
+        'type': 'expense',
+        'category': 'goal_savings',
+        'aiCategory': 'goal_savings',
+        'note': goalTitle.isEmpty
+            ? 'Savings for goal'
+            : 'Savings for goal: $goalTitle',
+        'timestamp': Timestamp.fromDate(now),
+        'monthKey': monthKey,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+
+      transaction.set(summaryRef, <String, dynamic>{
+        'monthKey': monthKey,
+        'monthLabel': _monthLabel(now),
+        'expenseTotal': FieldValue.increment(amountInBase),
+        'netTotal': FieldValue.increment(-amountInBase),
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
 
       transaction.update(goalRef, <String, dynamic>{
         'currentAmount': FieldValue.increment(amountInBase),

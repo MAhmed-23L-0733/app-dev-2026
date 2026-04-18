@@ -80,11 +80,11 @@ class ProfileView extends StatelessWidget {
                           style: Theme.of(context).textTheme.bodyMedium
                               ?.copyWith(color: onSurface.withOpacity(0.7)),
                         ),
-                        Text(
-                          user?.uid ?? 'No user id available',
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(color: onSurface.withOpacity(0.58)),
-                        ),
+                        // Text(
+                        //   user?.uid ?? 'No user id available',
+                        //   style: Theme.of(context).textTheme.bodySmall
+                        //       ?.copyWith(color: onSurface.withOpacity(0.58)),
+                        // ),
                       ],
                     ),
                   ),
@@ -105,11 +105,11 @@ class ProfileView extends StatelessWidget {
                   ),
                   const SizedBox(height: 14),
                   _SummaryRow(label: 'Authentication', value: provider),
-                  const SizedBox(height: 12),
-                  _SummaryRow(
-                    label: 'Currency',
-                    value: 'Managed from Dashboard',
-                  ),
+                  // const SizedBox(height: 12),
+                  // _SummaryRow(
+                  //   label: 'Currency',
+                  //   value: 'Managed from Dashboard',
+                  // ),
                   const SizedBox(height: 12),
                   _SummaryRow(label: 'Joined', value: joined),
                   const SizedBox(height: 12),
@@ -117,34 +117,34 @@ class ProfileView extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(height: 16),
-            GlassCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(
-                    'Security',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      color: onSurface,
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: Icon(
-                      Icons.security_rounded,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                    title: Text('Session', style: TextStyle(color: onSurface)),
-                    subtitle: Text(
-                      'Manage the signed-in account from this device',
-                      style: TextStyle(color: onSurface.withOpacity(0.68)),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            // const SizedBox(height: 16),
+            // GlassCard(
+            //   child: Column(
+            //     crossAxisAlignment: CrossAxisAlignment.start,
+            //     children: <Widget>[
+            //       Text(
+            //         'Security',
+            //         style: Theme.of(context).textTheme.titleLarge?.copyWith(
+            //           fontWeight: FontWeight.w800,
+            //           color: onSurface,
+            //         ),
+            //       ),
+            //       const SizedBox(height: 14),
+            //       ListTile(
+            //         contentPadding: EdgeInsets.zero,
+            //         leading: Icon(
+            //           Icons.security_rounded,
+            //           color: Theme.of(context).colorScheme.primary,
+            //         ),
+            //         title: Text('Session', style: TextStyle(color: onSurface)),
+            //         subtitle: Text(
+            //           'Manage the signed-in account from this device',
+            //           style: TextStyle(color: onSurface.withOpacity(0.68)),
+            //         ),
+            //       ),
+            //     ],
+            //   ),
+            // ),
             const SizedBox(height: 18),
             ElevatedButton.icon(
               onPressed: () => _confirmSignOut(context),

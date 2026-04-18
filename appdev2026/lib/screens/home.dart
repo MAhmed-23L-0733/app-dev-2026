@@ -549,7 +549,7 @@ class _TransactionRow extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
               Text(
-                transaction.category,
+                _transactionLabel(transaction),
                 style: Theme.of(context).textTheme.titleSmall?.copyWith(
                   fontWeight: FontWeight.w700,
                   color: onSurface,
@@ -578,4 +578,27 @@ class _TransactionRow extends StatelessWidget {
       ],
     );
   }
+}
+
+String _transactionLabel(TransactionModel transaction) {
+  final String category = transaction.category.trim();
+  final String aiCategory = transaction.aiCategory.trim();
+  final String note = transaction.note.trim();
+
+  if (category == 'goal_savings' || aiCategory == 'goal_savings') {
+    if (note.startsWith('Savings for goal:')) {
+      return note.replaceFirst('Savings for goal:', 'Goal savings -').trim();
+    }
+    return 'Goal savings';
+  }
+
+  if (category.isNotEmpty) {
+    return category;
+  }
+
+  if (aiCategory.isNotEmpty) {
+    return aiCategory;
+  }
+
+  return transaction.type == 'income' ? 'Income' : 'Expense';
 }
