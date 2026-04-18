@@ -63,7 +63,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
               preferredName: name,
             );
         if (!synced && mounted) {
-          _showMessage('Account created, but Firebase sync needs attention.');
+          _showMessage(
+            'Your account is ready. Some profile details may take a moment to update.',
+            isSuccess: false,
+          );
         }
       }
 
@@ -76,9 +79,15 @@ class _SignUpScreenState extends State<SignUpScreen> {
         (Route<dynamic> route) => false,
       );
     } on FirebaseAuthException catch (error) {
-      _showMessage(error.message ?? 'Unable to create your account.');
+      _showMessage(
+        error.message ?? 'Unable to create your account right now.',
+        isSuccess: false,
+      );
     } catch (_) {
-      _showMessage('Something went wrong while creating the account.');
+      _showMessage(
+        'We could not create your account right now. Please try again.',
+        isSuccess: false,
+      );
     } finally {
       if (mounted) {
         _uiState.setLoading(false);
@@ -98,7 +107,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
         final bool synced = await UserProfileService.instance
             .ensureUserDocumentSafely(user: user);
         if (!synced && mounted) {
-          _showMessage('Account created, but Firebase sync needs attention.');
+          _showMessage(
+            'Your account is ready. Some profile details may take a moment to update.',
+            isSuccess: false,
+          );
         }
       }
 
@@ -112,10 +124,16 @@ class _SignUpScreenState extends State<SignUpScreen> {
       );
     } on FirebaseAuthException catch (error) {
       if (error.code != 'google_sign_in_cancelled') {
-        _showMessage(error.message ?? 'Unable to sign up with Google.');
+        _showMessage(
+          error.message ?? 'Unable to sign up with Google right now.',
+          isSuccess: false,
+        );
       }
     } catch (_) {
-      _showMessage('Something went wrong with Google sign-up.');
+      _showMessage(
+        'Google sign-up did not work. Please try again.',
+        isSuccess: false,
+      );
     } finally {
       if (mounted) {
         _uiState.setLoading(false);
@@ -123,10 +141,15 @@ class _SignUpScreenState extends State<SignUpScreen> {
     }
   }
 
-  void _showMessage(String message) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+  void _showMessage(String message, {required bool isSuccess}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: isSuccess
+            ? Colors.green.shade700
+            : Colors.red.shade700,
+        content: Text(message),
+      ),
+    );
   }
 
   @override

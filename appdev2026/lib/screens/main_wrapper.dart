@@ -47,6 +47,7 @@ class _MainWrapperScreenState extends State<MainWrapperScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // We only need to check the screen width now; manual bottomInset math is removed.
     final bool isCompactScreen = MediaQuery.sizeOf(context).width < 380;
 
     return ChangeNotifierProvider<_MainWrapperUiState>.value(
@@ -60,7 +61,7 @@ class _MainWrapperScreenState extends State<MainWrapperScreen> {
               automaticallyImplyLeading: false,
               leadingWidth: isCompactScreen ? 172 : 212,
               leading: Padding(
-                padding: EdgeInsets.only(left: 16),
+                padding: const EdgeInsets.only(left: 16),
                 child: Align(
                   alignment: Alignment.centerLeft,
                   child: SpendWiseLogo(fontSize: isCompactScreen ? 20 : 24),
@@ -92,13 +93,16 @@ class _MainWrapperScreenState extends State<MainWrapperScreen> {
                 ),
               ),
             ),
-            bottomNavigationBar: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(28),
-                child: MediaQuery.removePadding(
-                  context: context,
-                  removeBottom: true,
+
+            // --- MODERNIZED BOTTOM NAVIGATION BAR ---
+            bottomNavigationBar: SafeArea(
+              // Automatically pads for the gesture bar, but guarantees AT LEAST 12px on older phones
+              minimum: const EdgeInsets.only(bottom: 12),
+              child: Padding(
+                // We leave bottom padding at 0 here because SafeArea handles it now
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(28),
                   child: BottomNavigationBar(
                     currentIndex: uiState.selectedIndex,
                     onTap: _handleTabChanged,

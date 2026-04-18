@@ -47,7 +47,7 @@ class _AddTransactionViewState extends State<AddTransactionView> {
 
     final User? user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      _showMessage('Sign in again to continue.');
+      _showMessage('Please sign in again to continue.', isSuccess: false);
       return;
     }
 
@@ -71,9 +71,12 @@ class _AddTransactionViewState extends State<AddTransactionView> {
         return;
       }
 
-      _showMessage('Transaction saved to Firebase.');
+      _showMessage('Transaction saved successfully.', isSuccess: true);
     } catch (_) {
-      _showMessage('Unable to save the transaction right now.');
+      _showMessage(
+        'We could not save your transaction right now. Please try again.',
+        isSuccess: false,
+      );
     } finally {
       if (mounted) {
         _uiState.setSaving(false);
@@ -144,9 +147,15 @@ class _AddTransactionViewState extends State<AddTransactionView> {
         return;
       }
 
-      _showMessage('Receipt parsed. Please review and save the transaction.');
+      _showMessage(
+        'Receipt scanned successfully. Please review and save your transaction.',
+        isSuccess: true,
+      );
     } catch (_) {
-      _showMessage('Could not process receipt image right now.');
+      _showMessage(
+        'We could not process that receipt image. Please try another photo.',
+        isSuccess: false,
+      );
     } finally {
       if (mounted) {
         _uiState.setAiUploading(false);
@@ -169,10 +178,15 @@ class _AddTransactionViewState extends State<AddTransactionView> {
     return 'image/jpeg';
   }
 
-  void _showMessage(String message) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+  void _showMessage(String message, {required bool isSuccess}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: isSuccess
+            ? Colors.green.shade700
+            : Colors.red.shade700,
+        content: Text(message),
+      ),
+    );
   }
 
   @override

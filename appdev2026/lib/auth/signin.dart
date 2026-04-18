@@ -56,7 +56,10 @@ class _SignInScreenState extends State<SignInScreen> {
         final bool synced = await UserProfileService.instance
             .ensureUserDocumentSafely(user: user);
         if (!synced && mounted) {
-          _showMessage('Signed in, but Firebase sync needs attention.');
+          _showMessage(
+            'You are signed in. Some profile details may take a moment to update.',
+            isSuccess: false,
+          );
         }
       }
 
@@ -71,9 +74,13 @@ class _SignInScreenState extends State<SignInScreen> {
     } on FirebaseAuthException catch (error) {
       _showMessage(
         error.message ?? 'Unable to sign in. Please check your credentials.',
+        isSuccess: false,
       );
     } catch (_) {
-      _showMessage('Something went wrong while signing in.');
+      _showMessage(
+        'We could not sign you in right now. Please try again.',
+        isSuccess: false,
+      );
     } finally {
       if (mounted) {
         _uiState.setLoading(false);
@@ -93,7 +100,10 @@ class _SignInScreenState extends State<SignInScreen> {
         final bool synced = await UserProfileService.instance
             .ensureUserDocumentSafely(user: user);
         if (!synced && mounted) {
-          _showMessage('Signed in, but Firebase sync needs attention.');
+          _showMessage(
+            'You are signed in. Some profile details may take a moment to update.',
+            isSuccess: false,
+          );
         }
       }
 
@@ -107,10 +117,16 @@ class _SignInScreenState extends State<SignInScreen> {
       );
     } on FirebaseAuthException catch (error) {
       if (error.code != 'google_sign_in_cancelled') {
-        _showMessage(error.message ?? 'Unable to sign in with Google.');
+        _showMessage(
+          error.message ?? 'Unable to sign in with Google right now.',
+          isSuccess: false,
+        );
       }
     } catch (_) {
-      _showMessage('Something went wrong with Google sign-in.');
+      _showMessage(
+        'Google sign-in did not work. Please try again.',
+        isSuccess: false,
+      );
     } finally {
       if (mounted) {
         _uiState.setLoading(false);
@@ -118,10 +134,15 @@ class _SignInScreenState extends State<SignInScreen> {
     }
   }
 
-  void _showMessage(String message) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+  void _showMessage(String message, {required bool isSuccess}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: isSuccess
+            ? Colors.green.shade700
+            : Colors.red.shade700,
+        content: Text(message),
+      ),
+    );
   }
 
   @override

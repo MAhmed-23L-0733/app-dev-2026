@@ -82,6 +82,16 @@ class BudgetFirestoreService {
         );
   }
 
+  Stream<List<TransactionModel>> watchAllTransactions(User user) {
+    return _transactions(user)
+        .orderBy('timestamp', descending: true)
+        .snapshots()
+        .map(
+          (QuerySnapshot<Map<String, dynamic>> snapshot) =>
+              snapshot.docs.map(TransactionModel.fromFirestore).toList(),
+        );
+  }
+
   Stream<List<GoalModel>> watchGoals(User user) {
     return _goals(user)
         .orderBy('deadline')
@@ -136,6 +146,51 @@ class BudgetFirestoreService {
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
     });
+  }
+
+  Future<void> deleteTransaction({
+    required User user,
+    required TransactionModel transaction,
+  }) async {
+    final DocumentReference<Map<String, dynamic>> transactionRef =
+        _transactions(user).doc(transaction.id);
+    final DocumentReference<Map<String, dynamic>> summaryRef =
+        _monthlySummaries(user).doc(transaction.monthKey);
+
+    final DocumentSnapshot<Map<String, dynamic>> transactionSnapshot =
+        await transactionRef.get();
+
+    if (!transactionSnapshot.exists) {
+      return;
+    }
+
+    await transactionRef.delete();
+
+    final QuerySnapshot<Map<String, dynamic>> remainingTransactions =
+        await _transactions(
+          user,
+        ).where('monthKey', isEqualTo: transaction.monthKey).get();
+
+    double incomeTotal = 0;
+    double expenseTotal = 0;
+
+    for (final QueryDocumentSnapshot<Map<String, dynamic>> doc
+        in remainingTransactions.docs) {
+      final Map<String, dynamic> data = doc.data();
+      final double amount = (data['amount'] as num? ?? 0).toDouble();
+      if ((data['type'] as String? ?? 'expense') == 'income') {
+        incomeTotal += amount;
+      } else {
+        expenseTotal += amount;
+      }
+    }
+
+    await summaryRef.set(<String, dynamic>{
+      'incomeTotal': incomeTotal,
+      'expenseTotal': expenseTotal,
+      'netTotal': incomeTotal - expenseTotal,
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
   }
 
   Future<void> addGoal({

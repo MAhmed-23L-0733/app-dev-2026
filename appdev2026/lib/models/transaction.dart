@@ -8,6 +8,7 @@ class TransactionModel {
   final String aiCategory; // AI tag
   final String note;
   final Timestamp timestamp;
+  final String monthKey;
 
   TransactionModel({
     required this.id,
@@ -17,6 +18,7 @@ class TransactionModel {
     required this.aiCategory,
     required this.note,
     required this.timestamp,
+    required this.monthKey,
   });
 
   // ==========================================
@@ -43,6 +45,7 @@ class TransactionModel {
 
       note: json['note'] as String? ?? 'Quick Log',
       timestamp: Timestamp.now(),
+      monthKey: _monthKeyFromTimestamp(Timestamp.now()),
     );
   }
   Map<String, dynamic> toMap() {
@@ -53,6 +56,7 @@ class TransactionModel {
       'aiCategory': aiCategory,
       'note': note,
       'timestamp': timestamp,
+      'monthKey': monthKey,
     };
   }
 
@@ -67,6 +71,17 @@ class TransactionModel {
       aiCategory: data['aiCategory'] as String? ?? '',
       note: data['note'] as String? ?? '',
       timestamp: data['timestamp'] as Timestamp? ?? Timestamp.now(),
+      monthKey:
+          data['monthKey'] as String? ??
+          _monthKeyFromTimestamp(
+            data['timestamp'] as Timestamp? ?? Timestamp.now(),
+          ),
     );
+  }
+
+  static String _monthKeyFromTimestamp(Timestamp timestamp) {
+    final DateTime value = timestamp.toDate();
+    final String month = value.month.toString().padLeft(2, '0');
+    return '${value.year}-$month';
   }
 }

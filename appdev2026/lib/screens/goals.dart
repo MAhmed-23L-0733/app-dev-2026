@@ -42,19 +42,19 @@ class _GoalsViewState extends State<GoalsView> {
 
     final User? user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      _showMessage('Sign in again to continue.');
+      _showMessage('Please sign in again to continue.', isSuccess: false);
       return;
     }
 
     final DateTime? deadline = _uiState.deadline;
     if (deadline == null) {
-      _showMessage('Choose a deadline.');
+      _showMessage('Please choose a deadline.', isSuccess: false);
       return;
     }
 
     final DateTime today = _startOfDay(DateTime.now());
     if (_startOfDay(deadline).isBefore(today)) {
-      _showMessage('Deadline cannot be older than today.');
+      _showMessage('Please choose today or a future date.', isSuccess: false);
       return;
     }
 
@@ -77,9 +77,12 @@ class _GoalsViewState extends State<GoalsView> {
         return;
       }
 
-      _showMessage('Goal saved.');
+      _showMessage('Goal saved successfully.', isSuccess: true);
     } catch (_) {
-      _showMessage('Unable to save the goal right now.');
+      _showMessage(
+        'We could not save your goal right now. Please try again.',
+        isSuccess: false,
+      );
     } finally {
       if (mounted) {
         _uiState.setSaving(false);
@@ -87,10 +90,15 @@ class _GoalsViewState extends State<GoalsView> {
     }
   }
 
-  void _showMessage(String message) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+  void _showMessage(String message, {required bool isSuccess}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: isSuccess
+            ? Colors.green.shade700
+            : Colors.red.shade700,
+        content: Text(message),
+      ),
+    );
   }
 
   @override
@@ -574,7 +582,10 @@ class _GoalCard extends StatelessWidget {
       final User? user = FirebaseAuth.instance.currentUser;
       if (user == null) {
         messenger.showSnackBar(
-          const SnackBar(content: Text('Sign in again to continue.')),
+          SnackBar(
+            backgroundColor: Colors.red.shade700,
+            content: const Text('Please sign in again to continue.'),
+          ),
         );
         return;
       }
@@ -594,16 +605,29 @@ class _GoalCard extends StatelessWidget {
         if (navigator.mounted && messenger.mounted) {
           navigator.pop();
           messenger.showSnackBar(
-            const SnackBar(content: Text('Goal progress updated.')),
+            SnackBar(
+              backgroundColor: Colors.green.shade700,
+              content: const Text('Goal progress updated successfully.'),
+            ),
           );
         }
       } on FirebaseException catch (error) {
         messenger.showSnackBar(
-          SnackBar(content: Text(error.message ?? 'Unable to update goal.')),
+          SnackBar(
+            backgroundColor: Colors.red.shade700,
+            content: Text(
+              error.message ?? 'We could not update your goal right now.',
+            ),
+          ),
         );
       } catch (_) {
         messenger.showSnackBar(
-          const SnackBar(content: Text('Unable to update goal.')),
+          SnackBar(
+            backgroundColor: Colors.red.shade700,
+            content: const Text(
+              'We could not update your goal right now. Please try again.',
+            ),
+          ),
         );
       } finally {
         if (navigator.mounted) {

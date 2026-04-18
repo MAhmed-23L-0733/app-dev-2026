@@ -356,33 +356,140 @@ class HomeView extends StatelessWidget {
                                         ),
                                       )
                                     else if (transactions.isEmpty)
-                                      Text(
-                                        'No transactions added this month yet.',
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .bodyMedium
-                                            ?.copyWith(
-                                              color: onSurface.withOpacity(0.7),
+                                      Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.stretch,
+                                        children: [
+                                          Text(
+                                            'No transactions added this month yet.',
+                                            style: Theme.of(context)
+                                                .textTheme
+                                                .bodyMedium
+                                                ?.copyWith(
+                                                  color: onSurface.withOpacity(
+                                                    0.7,
+                                                  ),
+                                                ),
+                                          ),
+                                          const SizedBox(height: 12),
+                                          SizedBox(
+                                            width: double.infinity,
+                                            child: InkWell(
+                                              onTap: () {
+                                                Navigator.pushNamed(
+                                                  context,
+                                                  '/transactions',
+                                                );
+                                              },
+                                              child: Padding(
+                                                padding: const EdgeInsets.all(
+                                                  12,
+                                                ),
+                                                child: Row(
+                                                  mainAxisAlignment:
+                                                      MainAxisAlignment.center,
+                                                  children: <Widget>[
+                                                    Text(
+                                                      'View All Transactions',
+                                                      style: Theme.of(context)
+                                                          .textTheme
+                                                          .titleSmall
+                                                          ?.copyWith(
+                                                            fontWeight:
+                                                                FontWeight.w700,
+                                                            color:
+                                                                Theme.of(
+                                                                      context,
+                                                                    )
+                                                                    .colorScheme
+                                                                    .primary,
+                                                          ),
+                                                    ),
+                                                    const SizedBox(width: 8),
+                                                    Icon(
+                                                      Icons
+                                                          .arrow_forward_rounded,
+                                                      color: Theme.of(
+                                                        context,
+                                                      ).colorScheme.primary,
+                                                      size: 18,
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
                                             ),
+                                          ),
+                                        ],
                                       )
                                     else
                                       Column(
-                                        children: transactions
-                                            .take(6)
-                                            .map(
-                                              (
-                                                TransactionModel transaction,
-                                              ) => Padding(
-                                                padding: const EdgeInsets.only(
-                                                  bottom: 12,
+                                        children: [
+                                          ...transactions
+                                              .take(5)
+                                              .map(
+                                                (
+                                                  TransactionModel transaction,
+                                                ) => Padding(
+                                                  padding:
+                                                      const EdgeInsets.only(
+                                                        bottom: 12,
+                                                      ),
+                                                  child: _TransactionRow(
+                                                    transaction: transaction,
+                                                    currencyCode: currencyCode,
+                                                  ),
                                                 ),
-                                                child: _TransactionRow(
-                                                  transaction: transaction,
-                                                  currencyCode: currencyCode,
+                                              )
+                                              .toList(),
+                                          const SizedBox(height: 12),
+                                          SizedBox(
+                                            width: double.infinity,
+                                            child: InkWell(
+                                              onTap: () {
+                                                Navigator.pushNamed(
+                                                  context,
+                                                  '/transactions',
+                                                );
+                                              },
+                                              child: Padding(
+                                                padding: const EdgeInsets.all(
+                                                  12,
+                                                ),
+                                                child: Row(
+                                                  mainAxisAlignment:
+                                                      MainAxisAlignment.center,
+                                                  children: <Widget>[
+                                                    Text(
+                                                      'View All Transactions',
+                                                      style: Theme.of(context)
+                                                          .textTheme
+                                                          .titleSmall
+                                                          ?.copyWith(
+                                                            fontWeight:
+                                                                FontWeight.w700,
+                                                            color:
+                                                                Theme.of(
+                                                                      context,
+                                                                    )
+                                                                    .colorScheme
+                                                                    .primary,
+                                                          ),
+                                                    ),
+                                                    const SizedBox(width: 8),
+                                                    Icon(
+                                                      Icons
+                                                          .arrow_forward_rounded,
+                                                      color: Theme.of(
+                                                        context,
+                                                      ).colorScheme.primary,
+                                                      size: 18,
+                                                    ),
+                                                  ],
                                                 ),
                                               ),
-                                            )
-                                            .toList(),
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                   ],
                                 ),
@@ -512,14 +619,26 @@ class _AiTextLogDialogBody extends StatelessWidget {
 
   final ScaffoldMessengerState? messenger;
 
+  void _showMessage(String message, {required bool isSuccess}) {
+    messenger?.showSnackBar(
+      SnackBar(
+        backgroundColor: isSuccess
+            ? Colors.green.shade700
+            : Colors.red.shade700,
+        content: Text(message),
+      ),
+    );
+  }
+
   Future<void> _submit(
     BuildContext context,
     _AiTextLogDialogUiState uiState,
   ) async {
     final String userInput = uiState.controller.text.trim();
     if (userInput.isEmpty) {
-      messenger?.showSnackBar(
-        const SnackBar(content: Text('Please enter transaction text.')),
+      _showMessage(
+        'Please describe the transaction before continuing.',
+        isSuccess: false,
       );
       return;
     }
@@ -531,14 +650,15 @@ class _AiTextLogDialogBody extends StatelessWidget {
       if (context.mounted) {
         Navigator.of(context).pop();
       }
-      messenger?.showSnackBar(
-        const SnackBar(content: Text('Transaction logged with AI.')),
-      );
+      _showMessage('Transaction added successfully.', isSuccess: true);
     } catch (error) {
       if (context.mounted) {
         uiState.setSubmitting(false);
       }
-      messenger?.showSnackBar(SnackBar(content: Text('AI log failed: $error')));
+      _showMessage(
+        'We could not add that transaction right now. Please try again.',
+        isSuccess: false,
+      );
     }
   }
 

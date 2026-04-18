@@ -8,7 +8,9 @@ import 'auth/signup.dart';
 import 'firebase_options.dart';
 import 'screens/main_wrapper.dart';
 import 'screens/splash_screen.dart'; // Added splash screen import
+import 'screens/transactions.dart'; // Added transactions screen import
 import 'theme_controller.dart';
+import 'widgets/neon_surface.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -53,6 +55,7 @@ class MyApp extends StatelessWidget {
             SignInScreen.routeName: (_) => const SignInScreen(),
             SignUpScreen.routeName: (_) => const SignUpScreen(),
             MainWrapperScreen.routeName: (_) => const MainWrapperScreen(),
+            '/transactions': (_) => const _TransactionsScreenWrapper(),
           },
         );
       },
@@ -226,4 +229,25 @@ TextTheme _responsiveTextTheme(TextTheme base) {
     labelMedium: base.labelMedium?.copyWith(fontSize: 12),
     labelSmall: base.labelSmall?.copyWith(fontSize: 11),
   );
+}
+
+/// Wrapper for the Transactions screen with AppBar and back button
+class _TransactionsScreenWrapper extends StatelessWidget {
+  const _TransactionsScreenWrapper();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      extendBodyBehindAppBar: false,
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_rounded),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text('All Transactions'),
+        centerTitle: false,
+      ),
+      body: const NeonBackground(child: TransactionsView()),
+    );
+  }
 }
