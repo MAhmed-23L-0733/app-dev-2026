@@ -1,0 +1,91 @@
+{
+  "project_info": {
+    "project_number": "147458789912",
+    "firebase_url": "https://app-dev-70fc9-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "app-dev-70fc9",
+    "storage_bucket": "app-dev-70fc9.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:147458789912:android:47b49c177de17b52be696d",
+        "android_client_info": {
+          "package_name": "com.example.appdev2026"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "147458789912-o5494sgmj8gt8k6r31ciphto5rvrag33.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCgTQ9CpsXXkiFt9IVfXfTg59vg3HJndXo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "147458789912-o5494sgmj8gt8k6r31ciphto5rvrag33.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "147458789912-7lhgp709pfifggise6f7reio89b8oesr.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.hackathonApp"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:147458789912:android:98133503671fc06dbe696d",
+        "android_client_info": {
+          "package_name": "com.example.hackathon_app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "147458789912-6i89uiljacgrhssi6etva69cjgc6jdhs.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.hackathon_app",
+            "certificate_hash": "11b5f2173c5d5aa0bb1059ef3792b826f548c867"
+          }
+        },
+        {
+          "client_id": "147458789912-o5494sgmj8gt8k6r31ciphto5rvrag33.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCgTQ9CpsXXkiFt9IVfXfTg59vg3HJndXo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "147458789912-o5494sgmj8gt8k6r31ciphto5rvrag33.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "147458789912-7lhgp709pfifggise6f7reio89b8oesr.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.hackathonApp"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

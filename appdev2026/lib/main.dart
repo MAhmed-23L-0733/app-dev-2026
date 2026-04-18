@@ -1,122 +1,187 @@
-import 'package:flutter/material.dart';
+// ignore_for_file: deprecated_member_use
 
-void main() {
+import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
+import 'auth/signin.dart';
+import 'auth/signup.dart';
+import 'firebase_options.dart';
+import 'screens/main_wrapper.dart';
+import 'theme_controller.dart';
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
-  // This widget is the root of your application.
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Flutter Demo',
-      theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // TRY THIS: Try running your application with "flutter run". You'll see
-        // the application has a purple toolbar. Then, without quitting the app,
-        // try changing the seedColor in the colorScheme below to Colors.green
-        // and then invoke "hot reload" (save your changes or press the "hot
-        // reload" button in a Flutter-supported IDE, or press "r" if you used
-        // the command line to start the app).
-        //
-        // Notice that the counter didn't reset back to zero; the application
-        // state is not lost during the reload. To reset the state, use hot
-        // restart instead.
-        //
-        // This works for code too, not just values: Most code changes can be
-        // tested with just a hot reload.
-        colorScheme: .fromSeed(seedColor: Colors.deepPurple),
-      ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
-    );
-  }
-}
+  Widget _buildInitialScreen() {
+    final User? user = FirebaseAuth.instance.currentUser;
+    final String? uid = user?.uid;
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
+    if (uid == null || uid.isEmpty) {
+      return const SignInScreen();
+    }
 
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
-
-  final String title;
-
-  @override
-  State<MyHomePage> createState() => _MyHomePageState();
-}
-
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
-
-  void _incrementCounter() {
-    setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
-    });
+    return const MainWrapperScreen();
   }
 
   @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
-    return Scaffold(
-      appBar: AppBar(
-        // TRY THIS: Try changing the color here to a specific color (to
-        // Colors.amber, perhaps?) and trigger a hot reload to see the AppBar
-        // change color while the other colors stay the same.
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
-        title: Text(widget.title),
-      ),
-      body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
-        child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          //
-          // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint"
-          // action in the IDE, or press "p" in the console), to see the
-          // wireframe for each widget.
-          mainAxisAlignment: .center,
-          children: [
-            const Text('You have pushed the button this many times:'),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
-          ],
-        ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
-      ),
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: appThemeController,
+      builder: (context, themeMode, _) {
+        return MaterialApp(
+          debugShowCheckedModeBanner: false,
+          title: 'Hackathon Firebase App',
+          themeMode: themeMode,
+          theme: _buildTheme(Brightness.light),
+          darkTheme: _buildTheme(Brightness.dark),
+          home: _buildInitialScreen(),
+          routes: <String, WidgetBuilder>{
+            SignInScreen.routeName: (_) => const SignInScreen(),
+            SignUpScreen.routeName: (_) => const SignUpScreen(),
+            MainWrapperScreen.routeName: (_) => const MainWrapperScreen(),
+          },
+        );
+      },
     );
   }
+}
+
+ThemeData _buildTheme(Brightness brightness) {
+  final bool isDark = brightness == Brightness.dark;
+  final Color surface = isDark
+      ? const Color(0xFF160C26)
+      : const Color(0xFFFFFFFF);
+  final Color onSurface = isDark
+      ? const Color(0xFFF6EEFF)
+      : const Color(0xFF140A24);
+  final Color primary = isDark ? Colors.purpleAccent : const Color(0xFF6E3BFF);
+  final Color secondary = isDark
+      ? Colors.deepPurpleAccent
+      : const Color(0xFF8D5CFF);
+
+  final Color appBarBackground = surface.withOpacity(isDark ? 0.58 : 0.78);
+  final Color cardBackground = surface.withOpacity(isDark ? 0.16 : 0.88);
+  final Color fieldBackground = isDark
+      ? Colors.white.withOpacity(0.08)
+      : const Color(0xFFF0EAFE);
+  final Color navBackground = surface.withOpacity(isDark ? 0.62 : 0.92);
+
+  final ColorScheme colorScheme = ColorScheme(
+    brightness: brightness,
+    primary: primary,
+    onPrimary: isDark ? const Color(0xFF18051E) : Colors.white,
+    secondary: secondary,
+    onSecondary: isDark ? const Color(0xFF140A24) : Colors.white,
+    error: const Color(0xFFFF6B93),
+    onError: Colors.white,
+    surface: surface,
+    onSurface: onSurface,
+    surfaceContainerHighest: surface.withOpacity(isDark ? 0.24 : 0.96),
+    onSurfaceVariant: onSurface.withOpacity(0.74),
+    outline: primary.withOpacity(0.35),
+    shadow: Colors.black,
+    inverseSurface: isDark ? const Color(0xFFF8F3FF) : const Color(0xFF1A1028),
+    onInverseSurface: isDark
+        ? const Color(0xFF1A1028)
+        : const Color(0xFFF8F3FF),
+    tertiary: const Color(0xFF00E5FF),
+    onTertiary: Colors.black,
+  );
+
+  return ThemeData(
+    useMaterial3: true,
+    brightness: brightness,
+    colorScheme: colorScheme,
+    scaffoldBackgroundColor: Colors.transparent,
+    appBarTheme: AppBarTheme(
+      backgroundColor: appBarBackground,
+      foregroundColor: onSurface,
+      centerTitle: false,
+      elevation: 0,
+      scrolledUnderElevation: 0,
+      surfaceTintColor: Colors.transparent,
+      titleTextStyle: TextStyle(
+        color: onSurface,
+        fontSize: 20,
+        fontWeight: FontWeight.w700,
+      ),
+      iconTheme: IconThemeData(color: onSurface),
+    ),
+    cardTheme: CardThemeData(
+      color: cardBackground,
+      elevation: 0,
+      margin: EdgeInsets.zero,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(24),
+        side: BorderSide(color: primary.withOpacity(0.18)),
+      ),
+    ),
+    inputDecorationTheme: InputDecorationTheme(
+      filled: true,
+      fillColor: fieldBackground,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
+      labelStyle: TextStyle(color: onSurface.withOpacity(0.72)),
+      hintStyle: TextStyle(color: onSurface.withOpacity(0.46)),
+      prefixIconColor: primary,
+      suffixIconColor: onSurface.withOpacity(0.64),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(18),
+        borderSide: BorderSide(color: primary.withOpacity(0.16)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(18),
+        borderSide: BorderSide(color: primary, width: 1.4),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(18),
+        borderSide: const BorderSide(color: Color(0xFFFF6B93)),
+      ),
+      focusedErrorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(18),
+        borderSide: const BorderSide(color: Color(0xFFFF6B93), width: 1.4),
+      ),
+    ),
+    elevatedButtonTheme: ElevatedButtonThemeData(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: primary,
+        foregroundColor: isDark ? const Color(0xFF0C0512) : Colors.white,
+        minimumSize: const Size.fromHeight(56),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        elevation: 0,
+        textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+      ),
+    ),
+    textButtonTheme: TextButtonThemeData(
+      style: TextButton.styleFrom(
+        foregroundColor: primary,
+        textStyle: const TextStyle(fontWeight: FontWeight.w700),
+      ),
+    ),
+    iconTheme: IconThemeData(color: onSurface),
+    bottomNavigationBarTheme: BottomNavigationBarThemeData(
+      backgroundColor: navBackground,
+      selectedItemColor: primary,
+      unselectedItemColor: onSurface.withOpacity(0.58),
+      showSelectedLabels: true,
+      showUnselectedLabels: true,
+      type: BottomNavigationBarType.fixed,
+    ),
+    dividerTheme: DividerThemeData(
+      color: primary.withOpacity(0.12),
+      thickness: 1,
+    ),
+    snackBarTheme: SnackBarThemeData(
+      backgroundColor: surface.withOpacity(isDark ? 0.96 : 0.98),
+      contentTextStyle: TextStyle(color: onSurface),
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+    ),
+  );
 }
