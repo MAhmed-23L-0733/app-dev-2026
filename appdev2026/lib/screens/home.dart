@@ -439,8 +439,7 @@ class HomeView extends StatelessWidget {
                                                     currencyCode: currencyCode,
                                                   ),
                                                 ),
-                                              )
-                                              .toList(),
+                                              ),
                                           const SizedBox(height: 12),
                                           SizedBox(
                                             width: double.infinity,

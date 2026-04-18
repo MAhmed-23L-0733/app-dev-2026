@@ -128,6 +128,14 @@ class _MainWrapperScreenState extends State<MainWrapperScreen> {
                 ),
               ),
             ),
+            floatingActionButton: FloatingActionButton(
+              onPressed: () => Navigator.pushNamed(context, '/chat'),
+              backgroundColor: const Color(0xFF1565C0),
+              tooltip: 'AI Chat',
+              child: const Icon(Icons.smart_toy_rounded, color: Colors.white),
+            ),
+            floatingActionButtonLocation:
+                FloatingActionButtonLocation.endDocked,
           );
         },
       ),

@@ -308,11 +308,11 @@ class TransactionsView extends StatelessWidget {
                                                     user: user,
                                                   ),
                                                 );
-                                              }).toList(),
+                                              }),
                                               const SizedBox(height: 8),
                                             ],
                                           );
-                                        }).toList(),
+                                        }),
                                     ],
                                   ),
                                 ),

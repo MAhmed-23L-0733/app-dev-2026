@@ -9,6 +9,7 @@ import 'firebase_options.dart';
 import 'screens/main_wrapper.dart';
 import 'screens/splash_screen.dart'; // Added splash screen import
 import 'screens/transactions.dart'; // Added transactions screen import
+import 'screens/chat_view.dart'; // Added chat view import
 import 'theme_controller.dart';
 import 'widgets/neon_surface.dart';
 
@@ -56,6 +57,7 @@ class MyApp extends StatelessWidget {
             SignUpScreen.routeName: (_) => const SignUpScreen(),
             MainWrapperScreen.routeName: (_) => const MainWrapperScreen(),
             '/transactions': (_) => const _TransactionsScreenWrapper(),
+            '/chat': (_) => const ChatView(),
           },
         );
       },
