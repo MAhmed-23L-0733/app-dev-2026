@@ -180,15 +180,17 @@ class BudgetFirestoreService {
     final DateTime startOfMonth = DateTime(now.year, now.month);
     final DateTime startOfNextMonth = DateTime(now.year, now.month + 1);
 
-    final QuerySnapshot<Map<String, dynamic>> transactionsSnapshot = await _transactions(
-      user,
-    )
-        .where(
-          'timestamp',
-          isGreaterThanOrEqualTo: Timestamp.fromDate(startOfMonth),
-        )
-        .where('timestamp', isLessThan: Timestamp.fromDate(startOfNextMonth))
-        .get();
+    final QuerySnapshot<Map<String, dynamic>> transactionsSnapshot =
+        await _transactions(user)
+            .where(
+              'timestamp',
+              isGreaterThanOrEqualTo: Timestamp.fromDate(startOfMonth),
+            )
+            .where(
+              'timestamp',
+              isLessThan: Timestamp.fromDate(startOfNextMonth),
+            )
+            .get();
 
     if (transactionsSnapshot.docs.isNotEmpty) {
       final double incomeTotal = transactionsSnapshot.docs
@@ -196,23 +198,23 @@ class BudgetFirestoreService {
             (QueryDocumentSnapshot<Map<String, dynamic>> doc) =>
                 (doc.data()['type'] as String?) == 'income',
           )
-          .fold<double>(
-            0,
-            (double total, QueryDocumentSnapshot<Map<String, dynamic>> doc) {
-              return total + (doc.data()['amount'] as num? ?? 0).toDouble();
-            },
-          );
+          .fold<double>(0, (
+            double total,
+            QueryDocumentSnapshot<Map<String, dynamic>> doc,
+          ) {
+            return total + (doc.data()['amount'] as num? ?? 0).toDouble();
+          });
       final double expenseTotal = transactionsSnapshot.docs
           .where(
             (QueryDocumentSnapshot<Map<String, dynamic>> doc) =>
                 (doc.data()['type'] as String?) != 'income',
           )
-          .fold<double>(
-            0,
-            (double total, QueryDocumentSnapshot<Map<String, dynamic>> doc) {
-              return total + (doc.data()['amount'] as num? ?? 0).toDouble();
-            },
-          );
+          .fold<double>(0, (
+            double total,
+            QueryDocumentSnapshot<Map<String, dynamic>> doc,
+          ) {
+            return total + (doc.data()['amount'] as num? ?? 0).toDouble();
+          });
 
       return incomeTotal - expenseTotal;
     }
@@ -223,7 +225,8 @@ class BudgetFirestoreService {
     final double incomeTotal = (data?['incomeTotal'] as num? ?? 0).toDouble();
     final double expenseTotal = (data?['expenseTotal'] as num? ?? 0).toDouble();
 
-    return (data?['netTotal'] as num?)?.toDouble() ?? (incomeTotal - expenseTotal);
+    return (data?['netTotal'] as num?)?.toDouble() ??
+        (incomeTotal - expenseTotal);
   }
 
   Future<void> addSavingsToGoal({
@@ -232,11 +235,17 @@ class BudgetFirestoreService {
     required double amount,
     required String currencyCode,
   }) async {
+    final DateTime now = DateTime.now();
+    final String monthKey = _monthKey(now);
     final double amountInBase = CurrencyPreferenceController.instance
         .toBaseAmount(amount, currencyCode);
     final DocumentReference<Map<String, dynamic>> goalRef = _goals(
       user,
     ).doc(goalId);
+    final DocumentReference<Map<String, dynamic>> transactionRef =
+        _transactions(user).doc();
+    final DocumentReference<Map<String, dynamic>> summaryRef =
+        _monthlySummaries(user).doc(monthKey);
     final double netTotal = await getCurrentMonthNetTotal(user);
 
     if (amountInBase > netTotal) {
@@ -255,6 +264,7 @@ class BudgetFirestoreService {
 
       final Map<String, dynamic> goalData =
           goalSnapshot.data() ?? <String, dynamic>{};
+      final String goalTitle = goalData['title'] as String? ?? 'Goal savings';
 
       final double currentAmount = (goalData['currentAmount'] as num? ?? 0)
           .toDouble();
@@ -291,6 +301,25 @@ class BudgetFirestoreService {
         'updatedAt': FieldValue.serverTimestamp(),
         if (currentAmount + amountInBase >= targetAmount) 'status': 'completed',
       });
+
+      transaction.set(transactionRef, <String, dynamic>{
+        'amount': amountInBase,
+        'type': 'expense',
+        'category': 'Goal Savings',
+        'aiCategory': 'Goal Savings',
+        'note': 'Saved toward goal: $goalTitle',
+        'timestamp': Timestamp.fromDate(now),
+        'monthKey': monthKey,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+
+      transaction.set(summaryRef, <String, dynamic>{
+        'monthKey': monthKey,
+        'monthLabel': _monthLabel(now),
+        'expenseTotal': FieldValue.increment(amountInBase),
+        'netTotal': FieldValue.increment(-amountInBase),
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
     });
   }
 

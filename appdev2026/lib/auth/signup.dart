@@ -2,6 +2,7 @@
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import 'google_auth_service.dart';
 import 'user_profile_service.dart';
@@ -21,20 +22,17 @@ class SignUpScreen extends StatefulWidget {
 class _SignUpScreenState extends State<SignUpScreen> {
   final GoogleAuthService _googleAuthService = const GoogleAuthService();
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
-  final TextEditingController _nameController = TextEditingController();
-  final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _passwordController = TextEditingController();
-  final TextEditingController _confirmPasswordController =
-      TextEditingController();
-  bool _obscurePassword = true;
-  bool _isLoading = false;
+  late final _SignUpUiState _uiState;
+
+  @override
+  void initState() {
+    super.initState();
+    _uiState = _SignUpUiState();
+  }
 
   @override
   void dispose() {
-    _nameController.dispose();
-    _emailController.dispose();
-    _passwordController.dispose();
-    _confirmPasswordController.dispose();
+    _uiState.dispose();
     super.dispose();
   }
 
@@ -43,19 +41,17 @@ class _SignUpScreenState extends State<SignUpScreen> {
       return;
     }
 
-    setState(() {
-      _isLoading = true;
-    });
+    _uiState.setLoading(true);
 
     try {
       final UserCredential credential = await FirebaseAuth.instance
           .createUserWithEmailAndPassword(
-            email: _emailController.text.trim(),
-            password: _passwordController.text,
+            email: _uiState.emailController.text.trim(),
+            password: _uiState.passwordController.text,
           );
 
       final User? user = credential.user;
-      final String name = _nameController.text.trim();
+      final String name = _uiState.nameController.text.trim();
 
       if (user != null) {
         await user.updateDisplayName(name);
@@ -85,17 +81,13 @@ class _SignUpScreenState extends State<SignUpScreen> {
       _showMessage('Something went wrong while creating the account.');
     } finally {
       if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
+        _uiState.setLoading(false);
       }
     }
   }
 
   Future<void> _continueWithGoogle() async {
-    setState(() {
-      _isLoading = true;
-    });
+    _uiState.setLoading(true);
 
     try {
       final UserCredential credential = await _googleAuthService
@@ -126,9 +118,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
       _showMessage('Something went wrong with Google sign-up.');
     } finally {
       if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
+        _uiState.setLoading(false);
       }
     }
   }
@@ -143,193 +133,241 @@ class _SignUpScreenState extends State<SignUpScreen> {
   Widget build(BuildContext context) {
     final bool isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Scaffold(
-      extendBodyBehindAppBar: true,
-      backgroundColor: Colors.transparent,
-      appBar: AppBar(
-        title: const Text('Sign Up'),
-        leading: IconButton(
-          tooltip: 'Back',
-          onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
-          icon: const Icon(Icons.arrow_back_rounded),
-        ),
-        actions: <Widget>[
-          IconButton(
-            tooltip: 'Toggle theme',
-            onPressed: appThemeController.toggleTheme,
-            icon: Icon(
-              isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
+    return ChangeNotifierProvider<_SignUpUiState>.value(
+      value: _uiState,
+      child: Consumer<_SignUpUiState>(
+        builder: (BuildContext context, _SignUpUiState uiState, _) {
+          return Scaffold(
+            extendBodyBehindAppBar: true,
+            backgroundColor: Colors.transparent,
+            appBar: AppBar(
+              title: const Text('Sign Up'),
+              leading: IconButton(
+                tooltip: 'Back',
+                onPressed: uiState.isLoading
+                    ? null
+                    : () => Navigator.of(context).pop(),
+                icon: const Icon(Icons.arrow_back_rounded),
+              ),
+              actions: <Widget>[
+                IconButton(
+                  tooltip: 'Toggle theme',
+                  onPressed: appThemeController.toggleTheme,
+                  icon: Icon(
+                    isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
+                  ),
+                ),
+                const SizedBox(width: 8),
+              ],
             ),
-          ),
-          const SizedBox(width: 8),
-        ],
-      ),
-      body: NeonBackground(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 520),
-              child: GlassCard(
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    mainAxisSize: MainAxisSize.min,
-                    children: <Widget>[
-                      Text(
-                        'Create your account',
-                        style: Theme.of(context).textTheme.headlineMedium
-                            ?.copyWith(
-                              fontWeight: FontWeight.w800,
-                              color: Theme.of(context).colorScheme.onSurface,
-                            ),
-                      ),
-                      const SizedBox(height: 24),
-                      TextFormField(
-                        controller: _nameController,
-                        textCapitalization: TextCapitalization.words,
-                        autofillHints: const <String>[AutofillHints.name],
-                        decoration: const InputDecoration(
-                          labelText: 'Full name',
-                          prefixIcon: Icon(Icons.person_outline_rounded),
-                        ),
-                        validator: (String? value) {
-                          final String text = value?.trim() ?? '';
-                          if (text.isEmpty) {
-                            return 'Enter your name.';
-                          }
-                          if (text.length < 2) {
-                            return 'Name must be at least 2 characters.';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _emailController,
-                        keyboardType: TextInputType.emailAddress,
-                        autofillHints: const <String>[AutofillHints.email],
-                        decoration: const InputDecoration(
-                          labelText: 'Email',
-                          prefixIcon: Icon(Icons.mail_outline_rounded),
-                        ),
-                        validator: (String? value) {
-                          final String text = value?.trim() ?? '';
-                          if (text.isEmpty) {
-                            return 'Enter your email address.';
-                          }
-                          if (!text.contains('@')) {
-                            return 'Enter a valid email address.';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _passwordController,
-                        obscureText: _obscurePassword,
-                        autofillHints: const <String>[
-                          AutofillHints.newPassword,
-                        ],
-                        decoration: InputDecoration(
-                          labelText: 'Password',
-                          prefixIcon: const Icon(Icons.lock_outline_rounded),
-                          suffixIcon: IconButton(
-                            onPressed: () {
-                              setState(() {
-                                _obscurePassword = !_obscurePassword;
-                              });
-                            },
-                            icon: Icon(
-                              _obscurePassword
-                                  ? Icons.visibility_rounded
-                                  : Icons.visibility_off_rounded,
-                            ),
-                          ),
-                        ),
-                        validator: (String? value) {
-                          final String text = value ?? '';
-                          if (text.isEmpty) {
-                            return 'Enter a password.';
-                          }
-                          if (text.length < 6) {
-                            return 'Use at least 6 characters.';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _confirmPasswordController,
-                        obscureText: _obscurePassword,
-                        decoration: const InputDecoration(
-                          labelText: 'Confirm password',
-                          prefixIcon: Icon(Icons.verified_user_outlined),
-                        ),
-                        validator: (String? value) {
-                          if ((value ?? '').isEmpty) {
-                            return 'Confirm your password.';
-                          }
-                          if (value != _passwordController.text) {
-                            return 'Passwords do not match.';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 24),
-                      ElevatedButton(
-                        onPressed: _isLoading ? null : _submit,
-                        child: _isLoading
-                            ? const SizedBox(
-                                height: 22,
-                                width: 22,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2.2,
-                                ),
-                              )
-                            : const Text('Sign Up'),
-                      ),
-                      const SizedBox(height: 14),
-                      OutlinedButton(
-                        onPressed: _isLoading ? null : _continueWithGoogle,
-                        style: OutlinedButton.styleFrom(
-                          minimumSize: const Size.fromHeight(56),
-                          side: BorderSide(
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.primary.withOpacity(0.35),
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(18),
-                          ),
-                        ),
-                        child: const Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
+            body: NeonBackground(
+              child: Center(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 520),
+                    child: GlassCard(
+                      child: Form(
+                        key: _formKey,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
                           mainAxisSize: MainAxisSize.min,
                           children: <Widget>[
-                            _GoogleGlyph(),
-                            SizedBox(width: 12),
-                            Text('Continue with Google'),
+                            Text(
+                              'Create your account',
+                              style: Theme.of(context).textTheme.headlineMedium
+                                  ?.copyWith(
+                                    fontWeight: FontWeight.w800,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onSurface,
+                                  ),
+                            ),
+                            const SizedBox(height: 24),
+                            TextFormField(
+                              controller: uiState.nameController,
+                              textCapitalization: TextCapitalization.words,
+                              autofillHints: const <String>[AutofillHints.name],
+                              decoration: const InputDecoration(
+                                labelText: 'Full name',
+                                prefixIcon: Icon(Icons.person_outline_rounded),
+                              ),
+                              validator: (String? value) {
+                                final String text = value?.trim() ?? '';
+                                if (text.isEmpty) {
+                                  return 'Enter your name.';
+                                }
+                                if (text.length < 2) {
+                                  return 'Name must be at least 2 characters.';
+                                }
+                                return null;
+                              },
+                            ),
+                            const SizedBox(height: 16),
+                            TextFormField(
+                              controller: uiState.emailController,
+                              keyboardType: TextInputType.emailAddress,
+                              autofillHints: const <String>[
+                                AutofillHints.email,
+                              ],
+                              decoration: const InputDecoration(
+                                labelText: 'Email',
+                                prefixIcon: Icon(Icons.mail_outline_rounded),
+                              ),
+                              validator: (String? value) {
+                                final String text = value?.trim() ?? '';
+                                if (text.isEmpty) {
+                                  return 'Enter your email address.';
+                                }
+                                if (!text.contains('@')) {
+                                  return 'Enter a valid email address.';
+                                }
+                                return null;
+                              },
+                            ),
+                            const SizedBox(height: 16),
+                            TextFormField(
+                              controller: uiState.passwordController,
+                              obscureText: uiState.obscurePassword,
+                              autofillHints: const <String>[
+                                AutofillHints.newPassword,
+                              ],
+                              decoration: InputDecoration(
+                                labelText: 'Password',
+                                prefixIcon: const Icon(
+                                  Icons.lock_outline_rounded,
+                                ),
+                                suffixIcon: IconButton(
+                                  onPressed: uiState.toggleObscurePassword,
+                                  icon: Icon(
+                                    uiState.obscurePassword
+                                        ? Icons.visibility_rounded
+                                        : Icons.visibility_off_rounded,
+                                  ),
+                                ),
+                              ),
+                              validator: (String? value) {
+                                final String text = value ?? '';
+                                if (text.isEmpty) {
+                                  return 'Enter a password.';
+                                }
+                                if (text.length < 6) {
+                                  return 'Use at least 6 characters.';
+                                }
+                                return null;
+                              },
+                            ),
+                            const SizedBox(height: 16),
+                            TextFormField(
+                              controller: uiState.confirmPasswordController,
+                              obscureText: uiState.obscurePassword,
+                              decoration: const InputDecoration(
+                                labelText: 'Confirm password',
+                                prefixIcon: Icon(Icons.verified_user_outlined),
+                              ),
+                              validator: (String? value) {
+                                if ((value ?? '').isEmpty) {
+                                  return 'Confirm your password.';
+                                }
+                                if (value != uiState.passwordController.text) {
+                                  return 'Passwords do not match.';
+                                }
+                                return null;
+                              },
+                            ),
+                            const SizedBox(height: 24),
+                            ElevatedButton(
+                              onPressed: uiState.isLoading ? null : _submit,
+                              child: uiState.isLoading
+                                  ? const SizedBox(
+                                      height: 22,
+                                      width: 22,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2.2,
+                                      ),
+                                    )
+                                  : const Text('Sign Up'),
+                            ),
+                            const SizedBox(height: 14),
+                            OutlinedButton(
+                              onPressed: uiState.isLoading
+                                  ? null
+                                  : _continueWithGoogle,
+                              style: OutlinedButton.styleFrom(
+                                minimumSize: const Size.fromHeight(56),
+                                side: BorderSide(
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.primary.withOpacity(0.35),
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(18),
+                                ),
+                              ),
+                              child: const Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                mainAxisSize: MainAxisSize.min,
+                                children: <Widget>[
+                                  _GoogleGlyph(),
+                                  SizedBox(width: 12),
+                                  Text('Continue with Google'),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            TextButton(
+                              onPressed: uiState.isLoading
+                                  ? null
+                                  : () => Navigator.of(context).pop(),
+                              child: const Text(
+                                'Already have an account? Sign in',
+                              ),
+                            ),
                           ],
                         ),
                       ),
-                      const SizedBox(height: 10),
-                      TextButton(
-                        onPressed: _isLoading
-                            ? null
-                            : () => Navigator.of(context).pop(),
-                        child: const Text('Already have an account? Sign in'),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
-        ),
+          );
+        },
       ),
     );
+  }
+}
+
+class _SignUpUiState extends ChangeNotifier {
+  final TextEditingController nameController = TextEditingController();
+  final TextEditingController emailController = TextEditingController();
+  final TextEditingController passwordController = TextEditingController();
+  final TextEditingController confirmPasswordController =
+      TextEditingController();
+  bool obscurePassword = true;
+  bool isLoading = false;
+
+  void toggleObscurePassword() {
+    obscurePassword = !obscurePassword;
+    notifyListeners();
+  }
+
+  void setLoading(bool value) {
+    if (isLoading == value) {
+      return;
+    }
+
+    isLoading = value;
+    notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    nameController.dispose();
+    emailController.dispose();
+    passwordController.dispose();
+    confirmPasswordController.dispose();
+    super.dispose();
   }
 }
 

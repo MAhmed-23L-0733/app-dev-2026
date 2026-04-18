@@ -3,6 +3,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../auth/user_profile_service.dart';
 import '../services/currency_service.dart';
@@ -492,122 +493,147 @@ Future<void> _showAiTextLogSheet(BuildContext context) async {
   );
 }
 
-class _AiTextLogDialog extends StatefulWidget {
+class _AiTextLogDialog extends StatelessWidget {
   const _AiTextLogDialog({required this.messenger});
 
   final ScaffoldMessengerState? messenger;
 
   @override
-  State<_AiTextLogDialog> createState() => _AiTextLogDialogState();
+  Widget build(BuildContext context) {
+    return ChangeNotifierProvider<_AiTextLogDialogUiState>(
+      create: (_) => _AiTextLogDialogUiState(),
+      child: _AiTextLogDialogBody(messenger: messenger),
+    );
+  }
 }
 
-class _AiTextLogDialogState extends State<_AiTextLogDialog> {
-  final TextEditingController _controller = TextEditingController();
-  bool _isSubmitting = false;
+class _AiTextLogDialogBody extends StatelessWidget {
+  const _AiTextLogDialogBody({required this.messenger});
 
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
+  final ScaffoldMessengerState? messenger;
 
-  Future<void> _submit() async {
-    final String userInput = _controller.text.trim();
+  Future<void> _submit(
+    BuildContext context,
+    _AiTextLogDialogUiState uiState,
+  ) async {
+    final String userInput = uiState.controller.text.trim();
     if (userInput.isEmpty) {
-      widget.messenger?.showSnackBar(
+      messenger?.showSnackBar(
         const SnackBar(content: Text('Please enter transaction text.')),
       );
       return;
     }
 
-    setState(() {
-      _isSubmitting = true;
-    });
+    uiState.setSubmitting(true);
 
     try {
       await AiExpenseService().logExpenseFromText(userInput);
-      if (mounted) {
+      if (context.mounted) {
         Navigator.of(context).pop();
       }
-      widget.messenger?.showSnackBar(
+      messenger?.showSnackBar(
         const SnackBar(content: Text('Transaction logged with AI.')),
       );
     } catch (error) {
-      if (mounted) {
-        setState(() {
-          _isSubmitting = false;
-        });
+      if (context.mounted) {
+        uiState.setSubmitting(false);
       }
-      widget.messenger?.showSnackBar(
-        SnackBar(content: Text('AI log failed: $error')),
-      );
+      messenger?.showSnackBar(SnackBar(content: Text('AI log failed: $error')));
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final Color onSurface = Theme.of(context).colorScheme.onSurface;
-    return AlertDialog(
-      title: Text(
-        'Quick AI text log',
-        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-          fontWeight: FontWeight.w800,
-          color: onSurface,
-        ),
-      ),
-      content: SingleChildScrollView(
-        child: SizedBox(
-          width: 420,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: <Widget>[
-              Text(
-                'Describe your transaction in one sentence.',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: onSurface.withOpacity(0.72),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _controller,
-                maxLines: 3,
-                textInputAction: TextInputAction.done,
-                decoration: const InputDecoration(
-                  hintText: 'Paid 1500 PKR for groceries at Imtiaz',
-                ),
-                onSubmitted: (_) {
-                  if (!_isSubmitting) {
-                    _submit();
-                  }
-                },
-              ),
-            ],
+    return Consumer<_AiTextLogDialogUiState>(
+      builder: (BuildContext context, _AiTextLogDialogUiState uiState, _) {
+        return AlertDialog(
+          title: Text(
+            'Quick AI text log',
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.w800,
+              color: onSurface,
+            ),
           ),
-        ),
-      ),
-      actions: <Widget>[
-        TextButton(
-          onPressed: _isSubmitting
-              ? null
-              : () {
-                  Navigator.of(context).pop();
-                },
-          child: const Text('Cancel'),
-        ),
-        FilledButton.icon(
-          onPressed: _isSubmitting ? null : _submit,
-          icon: _isSubmitting
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Icon(Icons.send_rounded),
-          label: Text(_isSubmitting ? 'Logging...' : 'Log transaction'),
-        ),
-      ],
+          content: SingleChildScrollView(
+            child: SizedBox(
+              width: 420,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: <Widget>[
+                  Text(
+                    'Describe your transaction in one sentence.',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: onSurface.withOpacity(0.72),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: uiState.controller,
+                    maxLines: 3,
+                    textInputAction: TextInputAction.done,
+                    decoration: const InputDecoration(
+                      hintText: 'Paid 1500 PKR for groceries at Imtiaz',
+                    ),
+                    onSubmitted: (_) {
+                      if (!uiState.isSubmitting) {
+                        _submit(context, uiState);
+                      }
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: uiState.isSubmitting
+                  ? null
+                  : () {
+                      Navigator.of(context).pop();
+                    },
+              child: const Text('Cancel'),
+            ),
+            FilledButton.icon(
+              onPressed: uiState.isSubmitting
+                  ? null
+                  : () => _submit(context, uiState),
+              icon: uiState.isSubmitting
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.send_rounded),
+              label: Text(
+                uiState.isSubmitting ? 'Logging...' : 'Log transaction',
+              ),
+            ),
+          ],
+        );
+      },
     );
+  }
+}
+
+class _AiTextLogDialogUiState extends ChangeNotifier {
+  final TextEditingController controller = TextEditingController();
+  bool isSubmitting = false;
+
+  void setSubmitting(bool value) {
+    if (isSubmitting == value) {
+      return;
+    }
+
+    isSubmitting = value;
+    notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    controller.dispose();
+    super.dispose();
   }
 }
 

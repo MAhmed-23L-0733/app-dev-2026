@@ -32,6 +32,7 @@ environment:
 # versions available, run `flutter pub outdated`.
 dependencies:
   flutter:
+  
     sdk: flutter
 
   # The following adds the Cupertino Icons font to your application.
@@ -55,7 +56,15 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.13.1 # Add this line
 
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/logo/app_logo.png"
+  min_sdk_android: 21
+  adaptive_icon_background: "#FFFFFF" # Fixed hex color
+  adaptive_icon_foreground: "assets/logo/foreground.png"
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
 
@@ -214,11 +223,11 @@ FILE PATH: lib\main.dart
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'auth/signin.dart';
 import 'auth/signup.dart';
 import 'firebase_options.dart';
 import 'screens/main_wrapper.dart';
+import 'screens/splash_screen.dart'; // Added splash screen import
 import 'theme_controller.dart';
 
 Future<void> main() async {
@@ -230,17 +239,6 @@ Future<void> main() async {
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
-  Widget _buildInitialScreen() {
-    final User? user = FirebaseAuth.instance.currentUser;
-    final String? uid = user?.uid;
-
-    if (uid == null || uid.isEmpty) {
-      return const SignInScreen();
-    }
-
-    return const MainWrapperScreen();
-  }
-
   @override
   Widget build(BuildContext context) {
     return ValueListenableBuilder<ThemeMode>(
@@ -248,11 +246,28 @@ class MyApp extends StatelessWidget {
       builder: (context, themeMode, _) {
         return MaterialApp(
           debugShowCheckedModeBanner: false,
-          title: 'Hackathon Firebase App',
+          title: 'SpendWise',
+          builder: (BuildContext context, Widget? child) {
+            final MediaQueryData mediaQuery = MediaQuery.of(context);
+            final bool isPhone = mediaQuery.size.width < 420;
+            final double systemScale = mediaQuery.textScaler.scale(1);
+            final double responsiveScale = isPhone ? 0.94 : 1.0;
+            final double clampedScale = (systemScale * responsiveScale).clamp(
+              0.85,
+              1.05,
+            );
+
+            return MediaQuery(
+              data: mediaQuery.copyWith(
+                textScaler: TextScaler.linear(clampedScale),
+              ),
+              child: child ?? const SizedBox.shrink(),
+            );
+          },
           themeMode: themeMode,
           theme: _buildTheme(Brightness.light),
           darkTheme: _buildTheme(Brightness.dark),
-          home: _buildInitialScreen(),
+          home: const SplashScreen(), // Point home to the new Splash Screen
           routes: <String, WidgetBuilder>{
             SignInScreen.routeName: (_) => const SignInScreen(),
             SignUpScreen.routeName: (_) => const SignUpScreen(),
@@ -266,6 +281,11 @@ class MyApp extends StatelessWidget {
 
 ThemeData _buildTheme(Brightness brightness) {
   final bool isDark = brightness == Brightness.dark;
+  final TextTheme baseTextTheme = ThemeData(
+    useMaterial3: true,
+    brightness: brightness,
+  ).textTheme;
+  final TextTheme textTheme = _responsiveTextTheme(baseTextTheme);
 
   // Clean Black and White surfaces
   final Color surface = isDark
@@ -316,6 +336,7 @@ ThemeData _buildTheme(Brightness brightness) {
     useMaterial3: true,
     brightness: brightness,
     colorScheme: colorScheme,
+    textTheme: textTheme,
     scaffoldBackgroundColor: Colors.transparent,
     appBarTheme: AppBarTheme(
       backgroundColor: appBarBackground,
@@ -324,9 +345,8 @@ ThemeData _buildTheme(Brightness brightness) {
       elevation: 0,
       scrolledUnderElevation: 0,
       surfaceTintColor: Colors.transparent,
-      titleTextStyle: TextStyle(
+      titleTextStyle: textTheme.titleLarge?.copyWith(
         color: onSurface,
-        fontSize: 20,
         fontWeight: FontWeight.w700,
       ),
       iconTheme: IconThemeData(color: onSurface),
@@ -343,7 +363,7 @@ ThemeData _buildTheme(Brightness brightness) {
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: fieldBackground,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       labelStyle: TextStyle(color: onSurface.withOpacity(0.72)),
       hintStyle: TextStyle(color: onSurface.withOpacity(0.46)),
       prefixIconColor: primary,
@@ -369,10 +389,10 @@ ThemeData _buildTheme(Brightness brightness) {
       style: ElevatedButton.styleFrom(
         backgroundColor: primary,
         foregroundColor: Colors.white,
-        minimumSize: const Size.fromHeight(56),
+        minimumSize: const Size.fromHeight(52),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
         elevation: 0,
-        textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+        textStyle: textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
       ),
     ),
     textButtonTheme: TextButtonThemeData(
@@ -387,8 +407,12 @@ ThemeData _buildTheme(Brightness brightness) {
       selectedItemColor: primary,
       unselectedItemColor: onSurface.withOpacity(0.58),
       showSelectedLabels: true,
-      showUnselectedLabels: true,
+      showUnselectedLabels: false,
       type: BottomNavigationBarType.fixed,
+      selectedLabelStyle: textTheme.labelSmall?.copyWith(
+        fontWeight: FontWeight.w700,
+      ),
+      unselectedLabelStyle: textTheme.labelSmall,
     ),
     dividerTheme: DividerThemeData(
       color: primary.withOpacity(0.12),
@@ -400,6 +424,26 @@ ThemeData _buildTheme(Brightness brightness) {
       behavior: SnackBarBehavior.floating,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
     ),
+  );
+}
+
+TextTheme _responsiveTextTheme(TextTheme base) {
+  return base.copyWith(
+    displayLarge: base.displayLarge?.copyWith(fontSize: 46),
+    displayMedium: base.displayMedium?.copyWith(fontSize: 39),
+    displaySmall: base.displaySmall?.copyWith(fontSize: 32),
+    headlineLarge: base.headlineLarge?.copyWith(fontSize: 29),
+    headlineMedium: base.headlineMedium?.copyWith(fontSize: 24),
+    headlineSmall: base.headlineSmall?.copyWith(fontSize: 21),
+    titleLarge: base.titleLarge?.copyWith(fontSize: 19),
+    titleMedium: base.titleMedium?.copyWith(fontSize: 16),
+    titleSmall: base.titleSmall?.copyWith(fontSize: 14),
+    bodyLarge: base.bodyLarge?.copyWith(fontSize: 15),
+    bodyMedium: base.bodyMedium?.copyWith(fontSize: 14),
+    bodySmall: base.bodySmall?.copyWith(fontSize: 12),
+    labelLarge: base.labelLarge?.copyWith(fontSize: 14),
+    labelMedium: base.labelMedium?.copyWith(fontSize: 12),
+    labelSmall: base.labelSmall?.copyWith(fontSize: 11),
   );
 }
 
@@ -1681,6 +1725,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../models/goal.dart';
+import '../models/transaction.dart';
 import '../services/budget_firestore_service.dart';
 import '../services/currency_service.dart';
 import '../widgets/neon_surface.dart';
@@ -1710,31 +1755,32 @@ class _GoalsViewState extends State<GoalsView> {
 
   Future<void> _pickDeadline() async {
     final DateTime now = DateTime.now();
-    final DateTime minimumDate = DateTime(
-      now.year,
-      now.month,
-      now.day,
-    ).add(const Duration(days: 1));
-    final DateTime initialDate =
-        _deadline ?? minimumDate.add(const Duration(days: 30));
+    // Ensure we start at the beginning of today [cite: 323, 476]
+    final DateTime today = DateTime(now.year, now.month, now.day);
 
     final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: initialDate.isBefore(minimumDate)
-          ? minimumDate
-          : initialDate,
-      firstDate: minimumDate,
+      initialDate: _deadline ?? today.add(const Duration(days: 30)),
+      firstDate: today, // This disables all previous dates in the UI
       lastDate: DateTime(now.year + 10),
+      selectableDayPredicate: (DateTime day) {
+        // Additional safety to ensure no time-of-day edge cases bypass this [cite: 328, 476]
+        return !day.isBefore(today);
+      },
     );
 
-    if (picked == null) {
-      return;
-    }
+    if (picked != null) {
+      // Safety check: if somehow a past date is picked, show the themed snackbar
+      if (picked.isBefore(today)) {
+        _showMessage('Please select today or a future date.');
+        return;
+      }
 
-    setState(() {
-      _deadline = picked;
-      _deadlineController.text = _formatDate(picked);
-    });
+      setState(() {
+        _deadline = picked;
+        _deadlineController.text = _formatDate(picked);
+      });
+    }
   }
 
   Future<void> _saveGoal(String currencyCode) async {
@@ -1754,8 +1800,9 @@ class _GoalsViewState extends State<GoalsView> {
       return;
     }
 
-    if (!deadline.isAfter(DateTime.now())) {
-      _showMessage('Deadline must be a future date.');
+    final DateTime today = _startOfDay(DateTime.now());
+    if (_startOfDay(deadline).isBefore(today)) {
+      _showMessage('Deadline cannot be older than today.');
       return;
     }
 
@@ -1781,7 +1828,7 @@ class _GoalsViewState extends State<GoalsView> {
         return;
       }
 
-      _showMessage('Goal saved to Firebase.');
+      _showMessage('Goal saved.');
     } catch (_) {
       _showMessage('Unable to save the goal right now.');
     } finally {
@@ -1818,182 +1865,229 @@ class _GoalsViewState extends State<GoalsView> {
     return ValueListenableBuilder<String>(
       valueListenable: CurrencyPreferenceController.instance.currencyCode,
       builder: (BuildContext context, String currencyCode, _) {
-        return StreamBuilder<double>(
-          stream: BudgetFirestoreService.instance
-              .watchMonthlySummary(user)
-              .map(
-                (snapshot) =>
-                    (snapshot.data()?['netTotal'] as num? ?? 0).toDouble(),
-              ),
-          builder: (BuildContext context, AsyncSnapshot<double> netSnapshot) {
-            final double availableNetBase = netSnapshot.data ?? 0.0;
-            final double availableNetDisplay = CurrencyPreferenceController
-                .instance
-                .fromBaseAmount(availableNetBase, currencyCode);
+        return StreamBuilder<List<TransactionModel>>(
+          stream: BudgetFirestoreService.instance.watchCurrentMonthTransactions(
+            user,
+          ),
+          builder:
+              (
+                BuildContext context,
+                AsyncSnapshot<List<TransactionModel>> transactionsSnapshot,
+              ) {
+                final List<TransactionModel> transactions =
+                    transactionsSnapshot.data ?? <TransactionModel>[];
+                final double incomeTotal = transactions
+                    .where(
+                      (TransactionModel transaction) =>
+                          transaction.type == 'income',
+                    )
+                    .fold<double>(
+                      0,
+                      (double total, TransactionModel transaction) =>
+                          total + transaction.amount,
+                    );
+                final double expenseTotal = transactions
+                    .where(
+                      (TransactionModel transaction) =>
+                          transaction.type != 'income',
+                    )
+                    .fold<double>(
+                      0,
+                      (double total, TransactionModel transaction) =>
+                          total + transaction.amount,
+                    );
+                final double availableNetBase = incomeTotal - expenseTotal;
+                final double availableNetDisplay = CurrencyPreferenceController
+                    .instance
+                    .fromBaseAmount(availableNetBase, currencyCode);
 
-            return StreamBuilder<List<GoalModel>>(
-              stream: BudgetFirestoreService.instance.watchGoals(user),
-              builder: (BuildContext context, AsyncSnapshot<List<GoalModel>> snapshot) {
-                final List<GoalModel> goals = snapshot.data ?? <GoalModel>[];
+                return StreamBuilder<List<GoalModel>>(
+                  stream: BudgetFirestoreService.instance.watchGoals(user),
+                  builder: (BuildContext context, AsyncSnapshot<List<GoalModel>> snapshot) {
+                    final List<GoalModel> goals =
+                        snapshot.data ?? <GoalModel>[];
 
-                return SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 120),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: <Widget>[
-                      GlassCard(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: <Widget>[
-                            Text(
-                              'Goals',
-                              style: Theme.of(context).textTheme.headlineSmall
-                                  ?.copyWith(
-                                    fontWeight: FontWeight.w800,
-                                    color: onSurface,
-                                  ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Set clear targets and track them alongside your monthly budget.',
-                              style: Theme.of(context).textTheme.bodyMedium
-                                  ?.copyWith(color: onSurface.withOpacity(0.7)),
-                            ),
-                            const SizedBox(height: 20),
-                            Form(
-                              key: _formKey,
-                              child: Column(
-                                children: <Widget>[
-                                  TextFormField(
-                                    controller: _titleController,
-                                    textCapitalization:
-                                        TextCapitalization.words,
-                                    decoration: const InputDecoration(
-                                      labelText: 'Goal title',
-                                      prefixIcon: Icon(Icons.flag_rounded),
-                                    ),
-                                    validator: (String? value) {
-                                      if ((value ?? '').trim().isEmpty) {
-                                        return 'Enter a goal title.';
-                                      }
-                                      return null;
-                                    },
-                                  ),
-                                  const SizedBox(height: 16),
-                                  TextFormField(
-                                    controller: _targetController,
-                                    keyboardType:
-                                        const TextInputType.numberWithOptions(
-                                          decimal: true,
-                                        ),
-                                    decoration: InputDecoration(
-                                      labelText:
-                                          'Target amount ($currencyCode)',
-                                      prefixText:
-                                          '${CurrencyPreferenceController.instance.optionFor(currencyCode).symbol} ',
-                                      prefixIcon: const Icon(
-                                        Icons.savings_rounded,
+                    return SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(20, 12, 20, 120),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: <Widget>[
+                          GlassCard(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: <Widget>[
+                                Text(
+                                  'Goals',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .headlineSmall
+                                      ?.copyWith(
+                                        fontWeight: FontWeight.w800,
+                                        color: onSurface,
                                       ),
-                                    ),
-                                    validator: (String? value) {
-                                      final double? amount = double.tryParse(
-                                        value?.trim() ?? '',
-                                      );
-                                      if (amount == null || amount <= 0) {
-                                        return 'Enter a valid target amount.';
-                                      }
-                                      return null;
-                                    },
-                                  ),
-                                  const SizedBox(height: 16),
-                                  TextFormField(
-                                    controller: _deadlineController,
-                                    readOnly: true,
-                                    onTap: _pickDeadline,
-                                    decoration: const InputDecoration(
-                                      labelText: 'Deadline',
-                                      prefixIcon: Icon(Icons.event_rounded),
-                                    ),
-                                    validator: (String? value) {
-                                      if (_deadline == null) {
-                                        return 'Choose a deadline.';
-                                      }
-                                      return null;
-                                    },
-                                  ),
-                                  const SizedBox(height: 20),
-                                  ElevatedButton.icon(
-                                    onPressed: _isSaving
-                                        ? null
-                                        : () => _saveGoal(currencyCode),
-                                    icon: const Icon(Icons.add_task_rounded),
-                                    label: Text(
-                                      _isSaving ? 'Saving...' : 'Save goal',
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      GlassCard(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: <Widget>[
-                            Text(
-                              'Saved goals',
-                              style: Theme.of(context).textTheme.titleLarge
-                                  ?.copyWith(
-                                    fontWeight: FontWeight.w800,
-                                    color: onSurface,
-                                  ),
-                            ),
-                            const SizedBox(height: 14),
-                            if (snapshot.connectionState ==
-                                ConnectionState.waiting)
-                              const Center(
-                                child: Padding(
-                                  padding: EdgeInsets.symmetric(vertical: 24),
-                                  child: CircularProgressIndicator(),
                                 ),
-                              )
-                            else if (goals.isEmpty)
-                              Text(
-                                'No goals yet. Add one to start tracking progress.',
-                                style: Theme.of(context).textTheme.bodyMedium
-                                    ?.copyWith(
-                                      color: onSurface.withOpacity(0.7),
-                                    ),
-                              )
-                            else
-                              Column(
-                                children: goals
-                                    .map(
-                                      (GoalModel goal) => Padding(
-                                        padding: const EdgeInsets.only(
-                                          bottom: 12,
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Set clear targets and track them alongside your monthly budget.',
+                                  style: Theme.of(context).textTheme.bodyMedium
+                                      ?.copyWith(
+                                        color: onSurface.withOpacity(0.7),
+                                      ),
+                                ),
+                                const SizedBox(height: 20),
+                                Form(
+                                  key: _formKey,
+                                  child: Column(
+                                    children: <Widget>[
+                                      TextFormField(
+                                        controller: _titleController,
+                                        textCapitalization:
+                                            TextCapitalization.words,
+                                        decoration: const InputDecoration(
+                                          labelText: 'Goal title',
+                                          prefixIcon: Icon(Icons.flag_rounded),
                                         ),
-                                        child: _GoalCard(
-                                          goal: goal,
-                                          availableNetDisplay:
-                                              availableNetDisplay,
-                                          currencyCode: currencyCode,
+                                        validator: (String? value) {
+                                          if ((value ?? '').trim().isEmpty) {
+                                            return 'Enter a goal title.';
+                                          }
+                                          return null;
+                                        },
+                                      ),
+                                      const SizedBox(height: 16),
+                                      TextFormField(
+                                        controller: _targetController,
+                                        keyboardType:
+                                            const TextInputType.numberWithOptions(
+                                              decimal: true,
+                                            ),
+                                        decoration: InputDecoration(
+                                          labelText:
+                                              'Target amount ($currencyCode)',
+                                          prefixText:
+                                              '${CurrencyPreferenceController.instance.optionFor(currencyCode).symbol} ',
+                                          prefixIcon: const Icon(
+                                            Icons.savings_rounded,
+                                          ),
+                                        ),
+                                        validator: (String? value) {
+                                          final double? amount =
+                                              double.tryParse(
+                                                value?.trim() ?? '',
+                                              );
+                                          if (amount == null || amount <= 0) {
+                                            return 'Enter a valid target amount.';
+                                          }
+                                          return null;
+                                        },
+                                      ),
+                                      const SizedBox(height: 16),
+                                      TextFormField(
+                                        controller: _deadlineController,
+                                        readOnly: true,
+                                        onTap: _pickDeadline,
+                                        decoration: const InputDecoration(
+                                          labelText: 'Deadline',
+                                          prefixIcon: Icon(Icons.event_rounded),
+                                        ),
+                                        validator: (String? value) {
+                                          if (_deadline == null) {
+                                            return 'Choose a deadline.';
+                                          }
+
+                                          final DateTime today = _startOfDay(
+                                            DateTime.now(),
+                                          );
+                                          if (_startOfDay(
+                                            _deadline!,
+                                          ).isBefore(today)) {
+                                            return 'Deadline cannot be older than today.';
+                                          }
+
+                                          return null;
+                                        },
+                                      ),
+                                      const SizedBox(height: 20),
+                                      ElevatedButton.icon(
+                                        onPressed: _isSaving
+                                            ? null
+                                            : () => _saveGoal(currencyCode),
+                                        icon: const Icon(
+                                          Icons.add_task_rounded,
+                                        ),
+                                        label: Text(
+                                          _isSaving ? 'Saving...' : 'Save goal',
                                         ),
                                       ),
-                                    )
-                                    .toList(),
-                              ),
-                          ],
-                        ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          GlassCard(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: <Widget>[
+                                Text(
+                                  'Saved goals',
+                                  style: Theme.of(context).textTheme.titleLarge
+                                      ?.copyWith(
+                                        fontWeight: FontWeight.w800,
+                                        color: onSurface,
+                                      ),
+                                ),
+                                const SizedBox(height: 14),
+                                if (snapshot.connectionState ==
+                                    ConnectionState.waiting)
+                                  const Center(
+                                    child: Padding(
+                                      padding: EdgeInsets.symmetric(
+                                        vertical: 24,
+                                      ),
+                                      child: CircularProgressIndicator(),
+                                    ),
+                                  )
+                                else if (goals.isEmpty)
+                                  Text(
+                                    'No goals yet. Add one to start tracking progress.',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodyMedium
+                                        ?.copyWith(
+                                          color: onSurface.withOpacity(0.7),
+                                        ),
+                                  )
+                                else
+                                  Column(
+                                    children: goals
+                                        .map(
+                                          (GoalModel goal) => Padding(
+                                            padding: const EdgeInsets.only(
+                                              bottom: 12,
+                                            ),
+                                            child: _GoalCard(
+                                              goal: goal,
+                                              availableNetBase:
+                                                  availableNetBase,
+                                              availableNetDisplay:
+                                                  availableNetDisplay,
+                                              currencyCode: currencyCode,
+                                            ),
+                                          ),
+                                        )
+                                        .toList(),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
+                    );
+                  },
                 );
               },
-            );
-          },
         );
       },
     );
@@ -2003,11 +2097,13 @@ class _GoalsViewState extends State<GoalsView> {
 class _GoalCard extends StatelessWidget {
   const _GoalCard({
     required this.goal,
+    required this.availableNetBase,
     required this.availableNetDisplay,
     required this.currencyCode,
   });
 
   final GoalModel goal;
+  final double availableNetBase;
   final double availableNetDisplay;
   final String currencyCode;
 
@@ -2017,13 +2113,16 @@ class _GoalCard extends StatelessWidget {
     bool isSaving = false;
 
     Future<void> submit(StateSetter setState) async {
+      final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+      final NavigatorState navigator = Navigator.of(context);
+
       if (!(formKey.currentState?.validate() ?? false)) {
         return;
       }
 
       final User? user = FirebaseAuth.instance.currentUser;
       if (user == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        messenger.showSnackBar(
           const SnackBar(content: Text('Sign in again to continue.')),
         );
         return;
@@ -2042,22 +2141,22 @@ class _GoalCard extends StatelessWidget {
           currencyCode: currencyCode,
         );
 
-        if (context.mounted) {
-          Navigator.of(context).pop();
-          ScaffoldMessenger.of(context).showSnackBar(
+        if (navigator.mounted && messenger.mounted) {
+          navigator.pop();
+          messenger.showSnackBar(
             const SnackBar(content: Text('Goal progress updated.')),
           );
         }
       } on FirebaseException catch (error) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        messenger.showSnackBar(
           SnackBar(content: Text(error.message ?? 'Unable to update goal.')),
         );
       } catch (_) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Unable to update goal.')));
+        messenger.showSnackBar(
+          const SnackBar(content: Text('Unable to update goal.')),
+        );
       } finally {
-        if (context.mounted) {
+        if (navigator.mounted) {
           setState(() {
             isSaving = false;
           });
@@ -2068,11 +2167,7 @@ class _GoalCard extends StatelessWidget {
     await showDialog<void>(
       context: context,
       builder: (BuildContext dialogContext) {
-        final double remainingDisplay = CurrencyPreferenceController.instance
-            .fromBaseAmount(
-              goal.targetAmount - goal.currentAmount,
-              currencyCode,
-            );
+        final double remainingBase = goal.targetAmount - goal.currentAmount;
 
         return StatefulBuilder(
           builder: (BuildContext context, StateSetter setState) {
@@ -2098,10 +2193,15 @@ class _GoalCard extends StatelessWidget {
                     if (amount == null || amount <= 0) {
                       return 'Enter a valid amount.';
                     }
-                    if (amount > availableNetDisplay) {
+                    final double enteredAmountBase =
+                        CurrencyPreferenceController.instance.toBaseAmount(
+                          amount,
+                          currencyCode,
+                        );
+                    if (enteredAmountBase > availableNetBase + 0.000001) {
                       return 'Amount is greater than the current net value.';
                     }
-                    if (amount > remainingDisplay) {
+                    if (enteredAmountBase > remainingBase + 0.000001) {
                       return 'Amount is greater than the remaining target.';
                     }
                     return null;
@@ -2245,6 +2345,10 @@ String _formatDate(DateTime value) {
   return '${months[value.month - 1]} ${value.day}, ${value.year}';
 }
 
+DateTime _startOfDay(DateTime value) {
+  return DateTime(value.year, value.month, value.day);
+}
+
 
 
 
@@ -2270,6 +2374,13 @@ class HomeView extends StatelessWidget {
   Widget build(BuildContext context) {
     final User? user = FirebaseAuth.instance.currentUser;
     final Color onSurface = Theme.of(context).colorScheme.onSurface;
+    final bool isCompactScreen = MediaQuery.sizeOf(context).width < 380;
+    final EdgeInsets contentPadding = EdgeInsets.fromLTRB(
+      isCompactScreen ? 16 : 20,
+      12,
+      isCompactScreen ? 16 : 20,
+      isCompactScreen ? 104 : 120,
+    );
 
     if (user == null) {
       return Center(
@@ -2341,7 +2452,7 @@ class HomeView extends StatelessWidget {
                         final double balanceBase = incomeTotal - expenseTotal;
 
                         return SingleChildScrollView(
-                          padding: const EdgeInsets.fromLTRB(20, 12, 20, 120),
+                          padding: contentPadding,
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: <Widget>[
@@ -2352,8 +2463,8 @@ class HomeView extends StatelessWidget {
                                     Row(
                                       children: <Widget>[
                                         Container(
-                                          width: 58,
-                                          height: 58,
+                                          width: isCompactScreen ? 50 : 58,
+                                          height: isCompactScreen ? 50 : 58,
                                           decoration: BoxDecoration(
                                             shape: BoxShape.circle,
                                             gradient: LinearGradient(
@@ -2368,14 +2479,18 @@ class HomeView extends StatelessWidget {
                                           alignment: Alignment.center,
                                           child: Text(
                                             _initials(user),
-                                            style: const TextStyle(
+                                            style: TextStyle(
                                               color: Colors.white,
-                                              fontSize: 20,
+                                              fontSize: isCompactScreen
+                                                  ? 17
+                                                  : 20,
                                               fontWeight: FontWeight.w800,
                                             ),
                                           ),
                                         ),
-                                        const SizedBox(width: 14),
+                                        SizedBox(
+                                          width: isCompactScreen ? 10 : 14,
+                                        ),
                                         Expanded(
                                           child: Column(
                                             crossAxisAlignment:
@@ -2403,59 +2518,41 @@ class HomeView extends StatelessWidget {
                                                           .withOpacity(0.74),
                                                     ),
                                               ),
-                                              const SizedBox(height: 12),
-                                              Align(
-                                                alignment: Alignment.centerLeft,
-                                                child: SizedBox(
-                                                  width: 220,
-                                                  child: DropdownButtonFormField<String>(
-                                                    value: currencyCode,
-                                                    decoration:
-                                                        const InputDecoration(
-                                                          labelText:
-                                                              'Currency converter',
-                                                          prefixIcon: Icon(
-                                                            Icons
-                                                                .payments_rounded,
-                                                          ),
-                                                        ),
-                                                    items: CurrencyPreferenceController
-                                                        .options
-                                                        .map(
-                                                          (
-                                                            CurrencyOption
-                                                            option,
-                                                          ) =>
-                                                              DropdownMenuItem<
-                                                                String
-                                                              >(
-                                                                value:
-                                                                    option.code,
-                                                                child: Text(
-                                                                  option.label,
-                                                                ),
-                                                              ),
-                                                        )
-                                                        .toList(),
-                                                    onChanged: (String? value) {
-                                                      if (value == null) {
-                                                        return;
-                                                      }
-
-                                                      UserProfileService
-                                                          .instance
-                                                          .updatePreferredCurrency(
-                                                            user,
-                                                            value,
-                                                          );
-                                                    },
-                                                  ),
-                                                ),
-                                              ),
                                             ],
                                           ),
                                         ),
                                       ],
+                                    ),
+                                    const SizedBox(height: 14),
+                                    DropdownButtonFormField<String>(
+                                      value: currencyCode,
+                                      decoration: const InputDecoration(
+                                        labelText: 'Currency converter',
+                                        prefixIcon: Icon(
+                                          Icons.payments_rounded,
+                                        ),
+                                      ),
+                                      items: CurrencyPreferenceController
+                                          .options
+                                          .map(
+                                            (CurrencyOption option) =>
+                                                DropdownMenuItem<String>(
+                                                  value: option.code,
+                                                  child: Text(option.label),
+                                                ),
+                                          )
+                                          .toList(),
+                                      onChanged: (String? value) {
+                                        if (value == null) {
+                                          return;
+                                        }
+
+                                        UserProfileService.instance
+                                            .updatePreferredCurrency(
+                                              user,
+                                              value,
+                                            );
+                                      },
                                     ),
                                     const SizedBox(height: 18),
                                     Text(
@@ -2857,6 +2954,7 @@ import 'home.dart';
 import 'profile.dart';
 import '../auth/user_profile_service.dart';
 import '../theme_controller.dart';
+import '../widgets/logo.dart';
 import '../widgets/neon_surface.dart';
 
 class MainWrapperScreen extends StatefulWidget {
@@ -2888,18 +2986,21 @@ class _MainWrapperScreenState extends State<MainWrapperScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final List<String> titles = <String>[
-      'Dashboard',
-      'Add transaction',
-      'Goals',
-      'Profile',
-    ];
+    final bool isCompactScreen = MediaQuery.sizeOf(context).width < 380;
 
     return Scaffold(
       extendBody: true,
       backgroundColor: Colors.transparent,
       appBar: AppBar(
-        title: Text(titles[_selectedIndex]),
+        automaticallyImplyLeading: false,
+        leadingWidth: isCompactScreen ? 172 : 200,
+        leading: Padding(
+          padding: EdgeInsets.only(left: 16),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: SpendWiseLogo(fontSize: isCompactScreen ? 23 : 31),
+          ),
+        ),
         actions: <Widget>[
           IconButton(
             tooltip: 'Toggle theme',
@@ -2982,6 +3083,7 @@ class ProfileView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final User? user = FirebaseAuth.instance.currentUser;
+    final bool isCompactScreen = MediaQuery.sizeOf(context).width < 380;
     final String name = _displayName(user);
     final String email = user?.email ?? 'No email linked';
     final String provider = _providerLabel(user);
@@ -3023,9 +3125,9 @@ class ProfileView extends StatelessWidget {
                           )
                         : Text(
                             _initials(user),
-                            style: const TextStyle(
+                            style: TextStyle(
                               color: Colors.white,
-                              fontSize: 26,
+                              fontSize: isCompactScreen ? 22 : 26,
                               fontWeight: FontWeight.w800,
                             ),
                           ),
@@ -3290,6 +3392,155 @@ String _formatDate(DateTime? value) {
 
 
 ========================================
+FILE PATH: lib\screens\splash_screen.dart
+========================================
+import 'dart:math';
+import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
+import '../auth/signin.dart';
+import 'main_wrapper.dart';
+import '../widgets/neon_surface.dart';
+
+class SplashScreen extends StatefulWidget {
+  const SplashScreen({super.key});
+
+  @override
+  State<SplashScreen> createState() => _SplashScreenState();
+}
+
+class _SplashScreenState extends State<SplashScreen>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _animation;
+  late List<Offset> _startOffsets;
+
+  // Replicating the SpendWiseLogo styling on a per-character basis
+  final List<Map<String, dynamic>> _logoChars = [
+    {'char': 'S', 'color': Colors.blue.shade400, 'shadow': true},
+    {'char': 'p', 'color': Colors.blue.shade400, 'shadow': true},
+    {'char': 'e', 'color': Colors.blue.shade400, 'shadow': true},
+    {'char': 'n', 'color': Colors.blue.shade400, 'shadow': true},
+    {'char': 'd', 'color': Colors.blue.shade400, 'shadow': true},
+    {'char': 'W', 'color': Colors.blue.shade900, 'shadow': false},
+    {'char': 'i', 'color': Colors.blue.shade900, 'shadow': false},
+    {'char': 's', 'color': Colors.blue.shade900, 'shadow': false},
+    {'char': 'e', 'color': Colors.blue.shade900, 'shadow': false},
+    {'char': '.', 'color': Colors.blueAccent, 'shadow': false},
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+
+    // Fixed seed ensures the "random" positions are consistent on every launch
+    final Random random = Random(42);
+
+    // Generate a scattered starting offset for each character
+    _startOffsets = List.generate(_logoChars.length, (index) {
+      final double dx = (random.nextDouble() - 0.5) * 800;
+      final double dy = (random.nextDouble() - 0.5) * 800;
+      return Offset(dx, dy);
+    });
+
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1800),
+    );
+
+    // easeOutCubic makes the letters start moving fast, then smoothly decelerate into place
+    _animation = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeOutCubic,
+    );
+
+    // Start the animation, pause briefly to let the user see the formed logo, then route
+    _controller.forward().then((_) {
+      Future.delayed(const Duration(milliseconds: 600), _checkAuthAndNavigate);
+    });
+  }
+
+  void _checkAuthAndNavigate() {
+    if (!mounted) return;
+
+    // Auth check replacing the logic previously handled in main.dart
+    final User? user = FirebaseAuth.instance.currentUser;
+    final String? uid = user?.uid;
+
+    if (uid == null || uid.isEmpty) {
+      Navigator.of(context).pushReplacementNamed(SignInScreen.routeName);
+    } else {
+      Navigator.of(context).pushReplacementNamed(MainWrapperScreen.routeName);
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Wrapped in your existing NeonBackground for thematic consistency
+    return Scaffold(
+      body: NeonBackground(
+        child: Center(
+          child: AnimatedBuilder(
+            animation: _animation,
+            builder: (context, child) {
+              return Row(
+                mainAxisSize: MainAxisSize.min,
+                children: List.generate(_logoChars.length, (index) {
+                  // Interpolate from the random scattered position to their natural (0,0) position
+                  final Offset currentOffset = Offset.lerp(
+                    _startOffsets[index],
+                    Offset.zero,
+                    _animation.value,
+                  )!;
+
+                  final double opacity = _animation.value.clamp(0.0, 1.0);
+                  final charData = _logoChars[index];
+
+                  return Transform.translate(
+                    offset: currentOffset,
+                    child: Opacity(
+                      opacity: opacity,
+                      child: Text(
+                        charData['char'],
+                        style: GoogleFonts.poppins(
+                          fontSize: 42.0,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 1.0,
+                          color: charData['color'],
+                          shadows: charData['shadow']
+                              ? [
+                                  Shadow(
+                                    color: Colors.blue.withOpacity(0.3),
+                                    offset: const Offset(0, 2),
+                                    blurRadius: 4,
+                                  ),
+                                ]
+                              : null,
+                        ),
+                      ),
+                    ),
+                  );
+                }),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+
+
+
+========================================
 FILE PATH: lib\services\budget_firestore_service.dart
 ========================================
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -3439,6 +3690,22 @@ class BudgetFirestoreService {
     required String currencyCode,
     required DateTime deadline,
   }) async {
+    final DateTime now = DateTime.now();
+    final DateTime today = DateTime(now.year, now.month, now.day);
+    final DateTime normalizedDeadline = DateTime(
+      deadline.year,
+      deadline.month,
+      deadline.day,
+    );
+
+    if (normalizedDeadline.isBefore(today)) {
+      throw FirebaseException(
+        plugin: 'cloud_firestore',
+        code: 'invalid-deadline',
+        message: 'Deadline cannot be older than today.',
+      );
+    }
+
     final double targetInBase = CurrencyPreferenceController.instance
         .toBaseAmount(targetAmount, currencyCode);
 
@@ -3492,7 +3759,13 @@ class BudgetFirestoreService {
           .toDouble();
       final double targetAmount = (goalData['targetAmount'] as num? ?? 0)
           .toDouble();
-      final double netTotal = (summaryData['netTotal'] as num? ?? 0).toDouble();
+      final double incomeTotal = (summaryData['incomeTotal'] as num? ?? 0)
+          .toDouble();
+      final double expenseTotal = (summaryData['expenseTotal'] as num? ?? 0)
+          .toDouble();
+      final double netTotal =
+          (summaryData['netTotal'] as num?)?.toDouble() ??
+          (incomeTotal - expenseTotal);
 
       if (amountInBase <= 0) {
         throw FirebaseException(
@@ -3703,7 +3976,7 @@ class SpendWiseLogo extends StatelessWidget {
 
   const SpendWiseLogo({
     super.key,
-    this.fontSize = 42.0, // Default large size for prominence
+    this.fontSize = 152.0, // Default large size for prominence
   });
 
   @override

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart'; // Required for Uint8List
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
 
 import 'budget_firestore_service.dart';
@@ -9,8 +10,13 @@ import 'budget_firestore_service.dart';
 import '../controllers/currency_controllers.dart';
 
 class AiExpenseService {
-  // Your API Key for the hackathon
-  static const String _apiKey = 'AIzaSyD_rhRUypQQjxDPNhwIu8fcPTKHhtI7nhs';
+  String get _apiKey {
+    final String? key = dotenv.env['GEMINI_API_KEY'];
+    if (key == null || key.isEmpty) {
+      throw Exception('Missing GEMINI_API_KEY in .env');
+    }
+    return key;
+  }
 
   // Centralized prompt for BOTH text and images
   final String _systemPrompt = '''
@@ -63,10 +69,7 @@ class AiExpenseService {
   // ==========================================
   // 3. Shared Logic for Gemini & Firestore
   // ==========================================
-  Future<void> _processAndSave(
-    List<Content> content, {
-    String? rawText,
-  }) async {
+  Future<void> _processAndSave(List<Content> content, {String? rawText}) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
       throw Exception('User must be signed in.');
@@ -175,22 +178,34 @@ class AiExpenseService {
   String? _detectCurrencyCodeFromText(String text) {
     final String value = text.toLowerCase();
 
-    if (value.contains('usd') || value.contains('dollar') || value.contains(r'$')) {
+    if (value.contains('usd') ||
+        value.contains('dollar') ||
+        value.contains(r'$')) {
       return 'USD';
     }
-    if (value.contains('eur') || value.contains('euro') || value.contains('€')) {
+    if (value.contains('eur') ||
+        value.contains('euro') ||
+        value.contains('€')) {
       return 'EUR';
     }
-    if (value.contains('gbp') || value.contains('pound') || value.contains('£')) {
+    if (value.contains('gbp') ||
+        value.contains('pound') ||
+        value.contains('£')) {
       return 'GBP';
     }
-    if (value.contains('aed') || value.contains('dirham') || value.contains('د.إ')) {
+    if (value.contains('aed') ||
+        value.contains('dirham') ||
+        value.contains('د.إ')) {
       return 'AED';
     }
-    if (value.contains('inr') || value.contains('rupee') || value.contains('₹')) {
+    if (value.contains('inr') ||
+        value.contains('rupee') ||
+        value.contains('₹')) {
       return 'INR';
     }
-    if (value.contains('pkr') || value.contains('rs ') || value.endsWith(' rs')) {
+    if (value.contains('pkr') ||
+        value.contains('rs ') ||
+        value.endsWith(' rs')) {
       return 'PKR';
     }
 

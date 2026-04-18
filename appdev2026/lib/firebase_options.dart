@@ -3,6 +3,7 @@
 import 'package:firebase_core/firebase_core.dart' show FirebaseOptions;
 import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, kIsWeb, TargetPlatform;
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 /// Default [FirebaseOptions] for use with your Firebase apps.
 ///
@@ -15,6 +16,14 @@ import 'package:flutter/foundation.dart'
 /// );
 /// ```
 class DefaultFirebaseOptions {
+  static String _env(String key) {
+    final String? value = dotenv.env[key];
+    if (value == null || value.isEmpty) {
+      throw UnsupportedError('Missing required environment variable: $key');
+    }
+    return value;
+  }
+
   static FirebaseOptions get currentPlatform {
     if (kIsWeb) {
       return web;
@@ -40,58 +49,58 @@ class DefaultFirebaseOptions {
     }
   }
 
-  static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyDpOSj2_qD1iWYvk_W7QmhwPybMw8c2jHg',
-    appId: '1:147458789912:web:85e35e863e08aaa5be696d',
-    messagingSenderId: '147458789912',
-    projectId: 'app-dev-70fc9',
-    authDomain: 'app-dev-70fc9.firebaseapp.com',
-    databaseURL: 'https://app-dev-70fc9-default-rtdb.asia-southeast1.firebasedatabase.app',
-    storageBucket: 'app-dev-70fc9.firebasestorage.app',
-    measurementId: 'G-TVDTTX65B3',
+  static FirebaseOptions get web => FirebaseOptions(
+    apiKey: _env('FIREBASE_WEB_API_KEY'),
+    appId: _env('FIREBASE_WEB_APP_ID'),
+    messagingSenderId: _env('FIREBASE_MESSAGING_SENDER_ID'),
+    projectId: _env('FIREBASE_PROJECT_ID'),
+    authDomain: _env('FIREBASE_WEB_AUTH_DOMAIN'),
+    databaseURL: _env('FIREBASE_DATABASE_URL'),
+    storageBucket: _env('FIREBASE_STORAGE_BUCKET'),
+    measurementId: _env('FIREBASE_WEB_MEASUREMENT_ID'),
   );
 
-  static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyCgTQ9CpsXXkiFt9IVfXfTg59vg3HJndXo',
-    appId: '1:147458789912:android:47b49c177de17b52be696d',
-    messagingSenderId: '147458789912',
-    projectId: 'app-dev-70fc9',
-    databaseURL: 'https://app-dev-70fc9-default-rtdb.asia-southeast1.firebasedatabase.app',
-    storageBucket: 'app-dev-70fc9.firebasestorage.app',
+  static FirebaseOptions get android => FirebaseOptions(
+    apiKey: _env('FIREBASE_ANDROID_API_KEY'),
+    appId: _env('FIREBASE_ANDROID_APP_ID'),
+    messagingSenderId: _env('FIREBASE_MESSAGING_SENDER_ID'),
+    projectId: _env('FIREBASE_PROJECT_ID'),
+    databaseURL: _env('FIREBASE_DATABASE_URL'),
+    storageBucket: _env('FIREBASE_STORAGE_BUCKET'),
   );
 
-  static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyBqeaNsPROO-kjNXgwVskD02ksCbqcFlDA',
-    appId: '1:147458789912:ios:9553acd291dab7e2be696d',
-    messagingSenderId: '147458789912',
-    projectId: 'app-dev-70fc9',
-    databaseURL: 'https://app-dev-70fc9-default-rtdb.asia-southeast1.firebasedatabase.app',
-    storageBucket: 'app-dev-70fc9.firebasestorage.app',
-    androidClientId: '147458789912-6i89uiljacgrhssi6etva69cjgc6jdhs.apps.googleusercontent.com',
-    iosClientId: '147458789912-93ljdl444vp0k1eh2d32utid65s05ta3.apps.googleusercontent.com',
-    iosBundleId: 'com.example.appdev2026',
+  static FirebaseOptions get ios => FirebaseOptions(
+    apiKey: _env('FIREBASE_IOS_API_KEY'),
+    appId: _env('FIREBASE_IOS_APP_ID'),
+    messagingSenderId: _env('FIREBASE_MESSAGING_SENDER_ID'),
+    projectId: _env('FIREBASE_PROJECT_ID'),
+    databaseURL: _env('FIREBASE_DATABASE_URL'),
+    storageBucket: _env('FIREBASE_STORAGE_BUCKET'),
+    androidClientId: _env('FIREBASE_ANDROID_CLIENT_ID'),
+    iosClientId: _env('FIREBASE_IOS_CLIENT_ID'),
+    iosBundleId: _env('FIREBASE_IOS_BUNDLE_ID'),
   );
 
-  static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'AIzaSyBqeaNsPROO-kjNXgwVskD02ksCbqcFlDA',
-    appId: '1:147458789912:ios:9553acd291dab7e2be696d',
-    messagingSenderId: '147458789912',
-    projectId: 'app-dev-70fc9',
-    databaseURL: 'https://app-dev-70fc9-default-rtdb.asia-southeast1.firebasedatabase.app',
-    storageBucket: 'app-dev-70fc9.firebasestorage.app',
-    androidClientId: '147458789912-6i89uiljacgrhssi6etva69cjgc6jdhs.apps.googleusercontent.com',
-    iosClientId: '147458789912-93ljdl444vp0k1eh2d32utid65s05ta3.apps.googleusercontent.com',
-    iosBundleId: 'com.example.appdev2026',
+  static FirebaseOptions get macos => FirebaseOptions(
+    apiKey: _env('FIREBASE_IOS_API_KEY'),
+    appId: _env('FIREBASE_IOS_APP_ID'),
+    messagingSenderId: _env('FIREBASE_MESSAGING_SENDER_ID'),
+    projectId: _env('FIREBASE_PROJECT_ID'),
+    databaseURL: _env('FIREBASE_DATABASE_URL'),
+    storageBucket: _env('FIREBASE_STORAGE_BUCKET'),
+    androidClientId: _env('FIREBASE_ANDROID_CLIENT_ID'),
+    iosClientId: _env('FIREBASE_IOS_CLIENT_ID'),
+    iosBundleId: _env('FIREBASE_IOS_BUNDLE_ID'),
   );
 
-  static const FirebaseOptions windows = FirebaseOptions(
-    apiKey: 'AIzaSyDpOSj2_qD1iWYvk_W7QmhwPybMw8c2jHg',
-    appId: '1:147458789912:web:1c1f82314c37f115be696d',
-    messagingSenderId: '147458789912',
-    projectId: 'app-dev-70fc9',
-    authDomain: 'app-dev-70fc9.firebaseapp.com',
-    databaseURL: 'https://app-dev-70fc9-default-rtdb.asia-southeast1.firebasedatabase.app',
-    storageBucket: 'app-dev-70fc9.firebasestorage.app',
-    measurementId: 'G-E8GTRV5K1D',
+  static FirebaseOptions get windows => FirebaseOptions(
+    apiKey: _env('FIREBASE_WINDOWS_API_KEY'),
+    appId: _env('FIREBASE_WINDOWS_APP_ID'),
+    messagingSenderId: _env('FIREBASE_MESSAGING_SENDER_ID'),
+    projectId: _env('FIREBASE_PROJECT_ID'),
+    authDomain: _env('FIREBASE_WEB_AUTH_DOMAIN'),
+    databaseURL: _env('FIREBASE_DATABASE_URL'),
+    storageBucket: _env('FIREBASE_STORAGE_BUCKET'),
+    measurementId: _env('FIREBASE_WINDOWS_MEASUREMENT_ID'),
   );
 }

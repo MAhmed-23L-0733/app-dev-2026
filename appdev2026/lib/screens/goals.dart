@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../models/goal.dart';
 import '../models/transaction.dart';
@@ -18,16 +19,19 @@ class _GoalsViewState extends State<GoalsView> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _targetController = TextEditingController();
-  final TextEditingController _deadlineController = TextEditingController();
-  DateTime? _deadline;
-  bool _isSaving = false;
-  bool _isDeadlinePickerExpanded = false;
+  late final _GoalsUiState _uiState;
+
+  @override
+  void initState() {
+    super.initState();
+    _uiState = _GoalsUiState();
+  }
 
   @override
   void dispose() {
     _titleController.dispose();
     _targetController.dispose();
-    _deadlineController.dispose();
+    _uiState.dispose();
     super.dispose();
   }
 
@@ -42,7 +46,7 @@ class _GoalsViewState extends State<GoalsView> {
       return;
     }
 
-    final DateTime? deadline = _deadline;
+    final DateTime? deadline = _uiState.deadline;
     if (deadline == null) {
       _showMessage('Choose a deadline.');
       return;
@@ -54,9 +58,7 @@ class _GoalsViewState extends State<GoalsView> {
       return;
     }
 
-    setState(() {
-      _isSaving = true;
-    });
+    _uiState.setSaving(true);
 
     try {
       await BudgetFirestoreService.instance.addGoal(
@@ -69,8 +71,7 @@ class _GoalsViewState extends State<GoalsView> {
 
       _titleController.clear();
       _targetController.clear();
-      _deadlineController.clear();
-      _deadline = null;
+      _uiState.clearDeadline();
 
       if (!mounted) {
         return;
@@ -81,9 +82,7 @@ class _GoalsViewState extends State<GoalsView> {
       _showMessage('Unable to save the goal right now.');
     } finally {
       if (mounted) {
-        setState(() {
-          _isSaving = false;
-        });
+        _uiState.setSaving(false);
       }
     }
   }
@@ -110,336 +109,440 @@ class _GoalsViewState extends State<GoalsView> {
       );
     }
 
-    return ValueListenableBuilder<String>(
-      valueListenable: CurrencyPreferenceController.instance.currencyCode,
-      builder: (BuildContext context, String currencyCode, _) {
-        return StreamBuilder<List<TransactionModel>>(
-          stream: BudgetFirestoreService.instance.watchCurrentMonthTransactions(
-            user,
-          ),
-          builder:
-              (
-                BuildContext context,
-                AsyncSnapshot<List<TransactionModel>> transactionsSnapshot,
-              ) {
-                final List<TransactionModel> transactions =
-                    transactionsSnapshot.data ?? <TransactionModel>[];
-                final double incomeTotal = transactions
-                    .where(
-                      (TransactionModel transaction) =>
-                          transaction.type == 'income',
-                    )
-                    .fold<double>(
-                      0,
-                      (double total, TransactionModel transaction) =>
-                          total + transaction.amount,
-                    );
-                final double expenseTotal = transactions
-                    .where(
-                      (TransactionModel transaction) =>
-                          transaction.type != 'income',
-                    )
-                    .fold<double>(
-                      0,
-                      (double total, TransactionModel transaction) =>
-                          total + transaction.amount,
-                    );
-                final double availableNetBase = incomeTotal - expenseTotal;
-                final double availableNetDisplay = CurrencyPreferenceController
-                    .instance
-                    .fromBaseAmount(availableNetBase, currencyCode);
+    return ChangeNotifierProvider<_GoalsUiState>.value(
+      value: _uiState,
+      child: Consumer<_GoalsUiState>(
+        builder: (BuildContext context, _GoalsUiState uiState, _) {
+          return ValueListenableBuilder<String>(
+            valueListenable: CurrencyPreferenceController.instance.currencyCode,
+            builder: (BuildContext context, String currencyCode, _) {
+              return StreamBuilder<List<TransactionModel>>(
+                stream: BudgetFirestoreService.instance
+                    .watchCurrentMonthTransactions(user),
+                builder:
+                    (
+                      BuildContext context,
+                      AsyncSnapshot<List<TransactionModel>>
+                      transactionsSnapshot,
+                    ) {
+                      final List<TransactionModel> transactions =
+                          transactionsSnapshot.data ?? <TransactionModel>[];
+                      final double incomeTotal = transactions
+                          .where(
+                            (TransactionModel transaction) =>
+                                transaction.type == 'income',
+                          )
+                          .fold<double>(
+                            0,
+                            (double total, TransactionModel transaction) =>
+                                total + transaction.amount,
+                          );
+                      final double expenseTotal = transactions
+                          .where(
+                            (TransactionModel transaction) =>
+                                transaction.type != 'income',
+                          )
+                          .fold<double>(
+                            0,
+                            (double total, TransactionModel transaction) =>
+                                total + transaction.amount,
+                          );
+                      final double availableNetBase =
+                          incomeTotal - expenseTotal;
+                      final double availableNetDisplay =
+                          CurrencyPreferenceController.instance.fromBaseAmount(
+                            availableNetBase,
+                            currencyCode,
+                          );
 
-                return StreamBuilder<List<GoalModel>>(
-                  stream: BudgetFirestoreService.instance.watchGoals(user),
-                  builder: (BuildContext context, AsyncSnapshot<List<GoalModel>> snapshot) {
-                    final List<GoalModel> goals =
-                        snapshot.data ?? <GoalModel>[];
+                      return StreamBuilder<List<GoalModel>>(
+                        stream: BudgetFirestoreService.instance.watchGoals(
+                          user,
+                        ),
+                        builder:
+                            (
+                              BuildContext context,
+                              AsyncSnapshot<List<GoalModel>> snapshot,
+                            ) {
+                              final List<GoalModel> goals =
+                                  snapshot.data ?? <GoalModel>[];
 
-                    return SingleChildScrollView(
-                      padding: const EdgeInsets.fromLTRB(20, 12, 20, 120),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: <Widget>[
-                          GlassCard(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: <Widget>[
-                                Text(
-                                  'Goals',
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .headlineSmall
-                                      ?.copyWith(
-                                        fontWeight: FontWeight.w800,
-                                        color: onSurface,
-                                      ),
+                              return SingleChildScrollView(
+                                padding: const EdgeInsets.fromLTRB(
+                                  20,
+                                  12,
+                                  20,
+                                  120,
                                 ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  'Set clear targets and track them alongside your monthly budget.',
-                                  style: Theme.of(context).textTheme.bodyMedium
-                                      ?.copyWith(
-                                        color: onSurface.withOpacity(0.7),
-                                      ),
-                                ),
-                                const SizedBox(height: 20),
-                                Form(
-                                  key: _formKey,
-                                  child: Column(
-                                    children: <Widget>[
-                                      TextFormField(
-                                        controller: _titleController,
-                                        textCapitalization:
-                                            TextCapitalization.words,
-                                        decoration: const InputDecoration(
-                                          labelText: 'Goal title',
-                                          prefixIcon: Icon(Icons.flag_rounded),
-                                        ),
-                                        validator: (String? value) {
-                                          if ((value ?? '').trim().isEmpty) {
-                                            return 'Enter a goal title.';
-                                          }
-                                          return null;
-                                        },
-                                      ),
-                                      const SizedBox(height: 16),
-                                      TextFormField(
-                                        controller: _targetController,
-                                        keyboardType:
-                                            const TextInputType.numberWithOptions(
-                                              decimal: true,
-                                            ),
-                                        decoration: InputDecoration(
-                                          labelText:
-                                              'Target amount ($currencyCode)',
-                                          prefixText:
-                                              '${CurrencyPreferenceController.instance.optionFor(currencyCode).symbol} ',
-                                          prefixIcon: const Icon(
-                                            Icons.savings_rounded,
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: <Widget>[
+                                    GlassCard(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: <Widget>[
+                                          Text(
+                                            'Goals',
+                                            style: Theme.of(context)
+                                                .textTheme
+                                                .headlineSmall
+                                                ?.copyWith(
+                                                  fontWeight: FontWeight.w800,
+                                                  color: onSurface,
+                                                ),
                                           ),
-                                        ),
-                                        validator: (String? value) {
-                                          final double? amount =
-                                              double.tryParse(
-                                                value?.trim() ?? '',
-                                              );
-                                          if (amount == null || amount <= 0) {
-                                            return 'Enter a valid target amount.';
-                                          }
-                                          return null;
-                                        },
-                                      ),
-                                      const SizedBox(height: 16),
-                                      FormField<DateTime>(
-                                        initialValue: _deadline,
-                                        validator: (DateTime? value) {
-                                          if (value == null) {
-                                            return 'Choose a deadline.';
-                                          }
-
-                                          final DateTime today = _startOfDay(
-                                            DateTime.now(),
-                                          );
-                                          if (_startOfDay(
-                                            value,
-                                          ).isBefore(today)) {
-                                            return 'Deadline cannot be older than today.';
-                                          }
-
-                                          return null;
-                                        },
-                                        builder: (FormFieldState<DateTime> field) {
-                                          final DateTime today = _startOfDay(
-                                            DateTime.now(),
-                                          );
-                                          final DateTime initialDate =
-                                              _deadline != null &&
-                                                  !_startOfDay(
-                                                    _deadline!,
-                                                  ).isBefore(today)
-                                              ? _startOfDay(_deadline!)
-                                              : today;
-
-                                          return Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: <Widget>[
-                                              InkWell(
-                                                borderRadius:
-                                                    BorderRadius.circular(18),
-                                                onTap: () {
-                                                  setState(() {
-                                                    _isDeadlinePickerExpanded =
-                                                        !_isDeadlinePickerExpanded;
-                                                  });
-                                                },
-                                                child: InputDecorator(
-                                                  decoration: InputDecoration(
-                                                    labelText: 'Deadline',
-                                                    prefixIcon: const Icon(
-                                                      Icons.event_rounded,
-                                                    ),
-                                                    suffixIcon: Icon(
-                                                      _isDeadlinePickerExpanded
-                                                          ? Icons
-                                                                .expand_less_rounded
-                                                          : Icons
-                                                                .expand_more_rounded,
-                                                    ),
-                                                    errorText: field.errorText,
-                                                  ),
-                                                  child: Text(
-                                                    _deadline == null
-                                                        ? 'Tap to choose a deadline'
-                                                        : _formatDate(
-                                                            _deadline!,
-                                                          ),
-                                                    style: Theme.of(
-                                                      context,
-                                                    ).textTheme.bodyMedium,
+                                          const SizedBox(height: 8),
+                                          Text(
+                                            'Set clear targets and track them alongside your monthly budget.',
+                                            style: Theme.of(context)
+                                                .textTheme
+                                                .bodyMedium
+                                                ?.copyWith(
+                                                  color: onSurface.withOpacity(
+                                                    0.7,
                                                   ),
                                                 ),
-                                              ),
-                                              AnimatedCrossFade(
-                                                firstChild:
-                                                    const SizedBox.shrink(),
-                                                secondChild: Padding(
-                                                  padding:
-                                                      const EdgeInsets.only(
-                                                        top: 12,
+                                          ),
+                                          const SizedBox(height: 20),
+                                          Form(
+                                            key: _formKey,
+                                            child: Column(
+                                              children: <Widget>[
+                                                TextFormField(
+                                                  controller: _titleController,
+                                                  textCapitalization:
+                                                      TextCapitalization.words,
+                                                  decoration:
+                                                      const InputDecoration(
+                                                        labelText: 'Goal title',
+                                                        prefixIcon: Icon(
+                                                          Icons.flag_rounded,
+                                                        ),
                                                       ),
-                                                  child: SizedBox(
-                                                    height: 330,
-                                                    child: CalendarDatePicker(
-                                                      initialDate: initialDate,
-                                                      firstDate: today,
-                                                      lastDate: DateTime(
-                                                        today.year + 10,
+                                                  validator: (String? value) {
+                                                    if ((value ?? '')
+                                                        .trim()
+                                                        .isEmpty) {
+                                                      return 'Enter a goal title.';
+                                                    }
+                                                    return null;
+                                                  },
+                                                ),
+                                                const SizedBox(height: 16),
+                                                TextFormField(
+                                                  controller: _targetController,
+                                                  keyboardType:
+                                                      const TextInputType.numberWithOptions(
+                                                        decimal: true,
                                                       ),
-                                                      onDateChanged: (DateTime selected) {
-                                                        final DateTime
-                                                        normalizedSelected =
-                                                            _startOfDay(
-                                                              selected,
-                                                            );
-                                                        if (normalizedSelected
-                                                            .isBefore(today)) {
-                                                          return;
-                                                        }
+                                                  decoration: InputDecoration(
+                                                    labelText:
+                                                        'Target amount ($currencyCode)',
+                                                    prefixText:
+                                                        '${CurrencyPreferenceController.instance.optionFor(currencyCode).symbol} ',
+                                                    prefixIcon: const Icon(
+                                                      Icons.savings_rounded,
+                                                    ),
+                                                  ),
+                                                  validator: (String? value) {
+                                                    final double? amount =
+                                                        double.tryParse(
+                                                          value?.trim() ?? '',
+                                                        );
+                                                    if (amount == null ||
+                                                        amount <= 0) {
+                                                      return 'Enter a valid target amount.';
+                                                    }
+                                                    return null;
+                                                  },
+                                                ),
+                                                const SizedBox(height: 16),
+                                                FormField<DateTime>(
+                                                  initialValue:
+                                                      uiState.deadline,
+                                                  validator: (DateTime? value) {
+                                                    if (value == null) {
+                                                      return 'Choose a deadline.';
+                                                    }
 
-                                                        setState(() {
-                                                          _deadline =
-                                                              normalizedSelected;
-                                                          _deadlineController
-                                                              .text = _formatDate(
-                                                            normalizedSelected,
-                                                          );
-                                                          _isDeadlinePickerExpanded =
-                                                              false;
-                                                        });
-                                                        field.didChange(
-                                                          normalizedSelected,
+                                                    final DateTime today =
+                                                        _startOfDay(
+                                                          DateTime.now(),
+                                                        );
+                                                    if (_startOfDay(
+                                                      value,
+                                                    ).isBefore(today)) {
+                                                      return 'Deadline cannot be older than today.';
+                                                    }
+
+                                                    return null;
+                                                  },
+                                                  builder:
+                                                      (
+                                                        FormFieldState<DateTime>
+                                                        field,
+                                                      ) {
+                                                        final DateTime today =
+                                                            _startOfDay(
+                                                              DateTime.now(),
+                                                            );
+                                                        final DateTime
+                                                        initialDate =
+                                                            uiState.deadline !=
+                                                                    null &&
+                                                                !_startOfDay(
+                                                                  uiState
+                                                                      .deadline!,
+                                                                ).isBefore(
+                                                                  today,
+                                                                )
+                                                            ? _startOfDay(
+                                                                uiState
+                                                                    .deadline!,
+                                                              )
+                                                            : today;
+
+                                                        return Column(
+                                                          crossAxisAlignment:
+                                                              CrossAxisAlignment
+                                                                  .start,
+                                                          children: <Widget>[
+                                                            InkWell(
+                                                              borderRadius:
+                                                                  BorderRadius.circular(
+                                                                    18,
+                                                                  ),
+                                                              onTap: () {
+                                                                uiState
+                                                                    .toggleDeadlinePickerExpanded();
+                                                              },
+                                                              child: InputDecorator(
+                                                                decoration: InputDecoration(
+                                                                  labelText:
+                                                                      'Deadline',
+                                                                  prefixIcon:
+                                                                      const Icon(
+                                                                        Icons
+                                                                            .event_rounded,
+                                                                      ),
+                                                                  suffixIcon: Icon(
+                                                                    uiState.isDeadlinePickerExpanded
+                                                                        ? Icons
+                                                                              .expand_less_rounded
+                                                                        : Icons
+                                                                              .expand_more_rounded,
+                                                                  ),
+                                                                  errorText: field
+                                                                      .errorText,
+                                                                ),
+                                                                child: Text(
+                                                                  uiState.deadline ==
+                                                                          null
+                                                                      ? 'Tap to choose a deadline'
+                                                                      : _formatDate(
+                                                                          uiState
+                                                                              .deadline!,
+                                                                        ),
+                                                                  style: Theme.of(
+                                                                    context,
+                                                                  ).textTheme.bodyMedium,
+                                                                ),
+                                                              ),
+                                                            ),
+                                                            AnimatedCrossFade(
+                                                              firstChild:
+                                                                  const SizedBox.shrink(),
+                                                              secondChild: Padding(
+                                                                padding:
+                                                                    const EdgeInsets.only(
+                                                                      top: 12,
+                                                                    ),
+                                                                child: SizedBox(
+                                                                  height: 330,
+                                                                  child: CalendarDatePicker(
+                                                                    initialDate:
+                                                                        initialDate,
+                                                                    firstDate:
+                                                                        today,
+                                                                    lastDate:
+                                                                        DateTime(
+                                                                          today.year +
+                                                                              10,
+                                                                        ),
+                                                                    onDateChanged:
+                                                                        (
+                                                                          DateTime
+                                                                          selected,
+                                                                        ) {
+                                                                          final DateTime
+                                                                          normalizedSelected = _startOfDay(
+                                                                            selected,
+                                                                          );
+                                                                          if (normalizedSelected.isBefore(
+                                                                            today,
+                                                                          )) {
+                                                                            return;
+                                                                          }
+
+                                                                          uiState.setDeadline(
+                                                                            normalizedSelected,
+                                                                          );
+                                                                          field.didChange(
+                                                                            normalizedSelected,
+                                                                          );
+                                                                        },
+                                                                  ),
+                                                                ),
+                                                              ),
+                                                              crossFadeState:
+                                                                  uiState
+                                                                      .isDeadlinePickerExpanded
+                                                                  ? CrossFadeState
+                                                                        .showSecond
+                                                                  : CrossFadeState
+                                                                        .showFirst,
+                                                              duration:
+                                                                  const Duration(
+                                                                    milliseconds:
+                                                                        220,
+                                                                  ),
+                                                            ),
+                                                          ],
                                                         );
                                                       },
-                                                    ),
+                                                ),
+                                                const SizedBox(height: 20),
+                                                ElevatedButton.icon(
+                                                  onPressed: uiState.isSaving
+                                                      ? null
+                                                      : () => _saveGoal(
+                                                          currencyCode,
+                                                        ),
+                                                  icon: const Icon(
+                                                    Icons.add_task_rounded,
+                                                  ),
+                                                  label: Text(
+                                                    uiState.isSaving
+                                                        ? 'Saving...'
+                                                        : 'Save goal',
                                                   ),
                                                 ),
-                                                crossFadeState:
-                                                    _isDeadlinePickerExpanded
-                                                    ? CrossFadeState.showSecond
-                                                    : CrossFadeState.showFirst,
-                                                duration: const Duration(
-                                                  milliseconds: 220,
-                                                ),
-                                              ),
-                                            ],
-                                          );
-                                        },
-                                      ),
-                                      const SizedBox(height: 20),
-                                      ElevatedButton.icon(
-                                        onPressed: _isSaving
-                                            ? null
-                                            : () => _saveGoal(currencyCode),
-                                        icon: const Icon(
-                                          Icons.add_task_rounded,
-                                        ),
-                                        label: Text(
-                                          _isSaving ? 'Saving...' : 'Save goal',
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          GlassCard(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: <Widget>[
-                                Text(
-                                  'Saved goals',
-                                  style: Theme.of(context).textTheme.titleLarge
-                                      ?.copyWith(
-                                        fontWeight: FontWeight.w800,
-                                        color: onSurface,
-                                      ),
-                                ),
-                                const SizedBox(height: 14),
-                                if (snapshot.connectionState ==
-                                    ConnectionState.waiting)
-                                  const Center(
-                                    child: Padding(
-                                      padding: EdgeInsets.symmetric(
-                                        vertical: 24,
-                                      ),
-                                      child: CircularProgressIndicator(),
-                                    ),
-                                  )
-                                else if (goals.isEmpty)
-                                  Text(
-                                    'No goals yet. Add one to start tracking progress.',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .bodyMedium
-                                        ?.copyWith(
-                                          color: onSurface.withOpacity(0.7),
-                                        ),
-                                  )
-                                else
-                                  Column(
-                                    children: goals
-                                        .map(
-                                          (GoalModel goal) => Padding(
-                                            padding: const EdgeInsets.only(
-                                              bottom: 12,
-                                            ),
-                                            child: _GoalCard(
-                                              goal: goal,
-                                              availableNetBase:
-                                                  availableNetBase,
-                                              availableNetDisplay:
-                                                  availableNetDisplay,
-                                              currencyCode: currencyCode,
+                                              ],
                                             ),
                                           ),
-                                        )
-                                        .toList(),
-                                  ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                );
-              },
-        );
-      },
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(height: 16),
+                                    GlassCard(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: <Widget>[
+                                          Text(
+                                            'Saved goals',
+                                            style: Theme.of(context)
+                                                .textTheme
+                                                .titleLarge
+                                                ?.copyWith(
+                                                  fontWeight: FontWeight.w800,
+                                                  color: onSurface,
+                                                ),
+                                          ),
+                                          const SizedBox(height: 14),
+                                          if (snapshot.connectionState ==
+                                              ConnectionState.waiting)
+                                            const Center(
+                                              child: Padding(
+                                                padding: EdgeInsets.symmetric(
+                                                  vertical: 24,
+                                                ),
+                                                child:
+                                                    CircularProgressIndicator(),
+                                              ),
+                                            )
+                                          else if (goals.isEmpty)
+                                            Text(
+                                              'No goals yet. Add one to start tracking progress.',
+                                              style: Theme.of(context)
+                                                  .textTheme
+                                                  .bodyMedium
+                                                  ?.copyWith(
+                                                    color: onSurface
+                                                        .withOpacity(0.7),
+                                                  ),
+                                            )
+                                          else
+                                            Column(
+                                              children: goals
+                                                  .map(
+                                                    (GoalModel goal) => Padding(
+                                                      padding:
+                                                          const EdgeInsets.only(
+                                                            bottom: 12,
+                                                          ),
+                                                      child: _GoalCard(
+                                                        goal: goal,
+                                                        availableNetBase:
+                                                            availableNetBase,
+                                                        availableNetDisplay:
+                                                            availableNetDisplay,
+                                                        currencyCode:
+                                                            currencyCode,
+                                                      ),
+                                                    ),
+                                                  )
+                                                  .toList(),
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                      );
+                    },
+              );
+            },
+          );
+        },
+      ),
     );
+  }
+}
+
+class _GoalsUiState extends ChangeNotifier {
+  DateTime? deadline;
+  bool isSaving = false;
+  bool isDeadlinePickerExpanded = false;
+
+  void setSaving(bool value) {
+    if (isSaving == value) {
+      return;
+    }
+
+    isSaving = value;
+    notifyListeners();
+  }
+
+  void toggleDeadlinePickerExpanded() {
+    isDeadlinePickerExpanded = !isDeadlinePickerExpanded;
+    notifyListeners();
+  }
+
+  void setDeadline(DateTime value) {
+    deadline = value;
+    isDeadlinePickerExpanded = false;
+    notifyListeners();
+  }
+
+  void clearDeadline() {
+    deadline = null;
+    isDeadlinePickerExpanded = false;
+    notifyListeners();
   }
 }
 
@@ -457,11 +560,10 @@ class _GoalCard extends StatelessWidget {
   final String currencyCode;
 
   Future<void> _addSavings(BuildContext context) async {
-    final TextEditingController amountController = TextEditingController();
     final GlobalKey<FormState> formKey = GlobalKey<FormState>();
-    bool isSaving = false;
+    String amountInput = '';
 
-    Future<void> submit(StateSetter setState) async {
+    Future<void> submit(_GoalSavingsDialogUiState dialogState) async {
       final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
       final NavigatorState navigator = Navigator.of(context);
 
@@ -477,10 +579,9 @@ class _GoalCard extends StatelessWidget {
         return;
       }
 
-      final double amount = double.parse(amountController.text.trim());
-      setState(() {
-        isSaving = true;
-      });
+      formKey.currentState?.save();
+      final double amount = double.parse(amountInput.trim());
+      dialogState.setSaving(true);
 
       try {
         await BudgetFirestoreService.instance.addSavingsToGoal(
@@ -506,9 +607,7 @@ class _GoalCard extends StatelessWidget {
         );
       } finally {
         if (navigator.mounted) {
-          setState(() {
-            isSaving = false;
-          });
+          dialogState.setSaving(false);
         }
       }
     }
@@ -525,56 +624,67 @@ class _GoalCard extends StatelessWidget {
         final double remainingDisplay =
             targetDisplayAmount - currentDisplayAmount;
 
-        return StatefulBuilder(
-          builder: (BuildContext context, StateSetter setState) {
-            return AlertDialog(
-              title: Text('Add savings to ${goal.title}'),
-              content: Form(
-                key: formKey,
-                child: TextFormField(
-                  controller: amountController,
-                  autofocus: true,
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
-                  decoration: InputDecoration(
-                    labelText: 'Savings amount ($currencyCode)',
-                    prefixText:
-                        '${CurrencyPreferenceController.instance.optionFor(currencyCode).symbol} ',
-                    helperText:
-                        'Available net: ${CurrencyPreferenceController.instance.optionFor(currencyCode).symbol}${availableNetDisplay.toStringAsFixed(2)}',
-                  ),
-                  validator: (String? value) {
-                    final double? amount = double.tryParse(value?.trim() ?? '');
-                    if (amount == null || amount <= 0) {
-                      return 'Enter a valid amount.';
-                    }
+        return ChangeNotifierProvider<_GoalSavingsDialogUiState>(
+          create: (_) => _GoalSavingsDialogUiState(),
+          child: Consumer<_GoalSavingsDialogUiState>(
+            builder: (BuildContext context, _GoalSavingsDialogUiState dialogState, _) {
+              return AlertDialog(
+                title: Text('Add savings to ${goal.title}'),
+                content: Form(
+                  key: formKey,
+                  child: TextFormField(
+                    autofocus: true,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    decoration: InputDecoration(
+                      labelText: 'Savings amount ($currencyCode)',
+                      prefixText:
+                          '${CurrencyPreferenceController.instance.optionFor(currencyCode).symbol} ',
+                      helperText:
+                          'Available net: ${CurrencyPreferenceController.instance.optionFor(currencyCode).symbol}${availableNetDisplay.toStringAsFixed(2)}',
+                    ),
+                    onSaved: (String? value) {
+                      amountInput = value?.trim() ?? '';
+                    },
+                    validator: (String? value) {
+                      final double? amount = double.tryParse(
+                        value?.trim() ?? '',
+                      );
+                      if (amount == null || amount <= 0) {
+                        return 'Enter a valid amount.';
+                      }
 
-                    // Directly compare the entered amount against the display limits seen by the user
-                    if (amount > availableNetDisplay + 0.000001) {
-                      return 'Amount is greater than the current net value.';
-                    }
-                    if (amount > remainingDisplay + 0.000001) {
-                      return 'Amount is greater than the remaining target.';
-                    }
-                    return null;
-                  },
+                      // Directly compare the entered amount against the display limits seen by the user
+                      if (amount > availableNetDisplay + 0.000001) {
+                        return 'Amount is greater than the current net value.';
+                      }
+                      if (amount > remainingDisplay + 0.000001) {
+                        return 'Amount is greater than the remaining target.';
+                      }
+                      return null;
+                    },
+                  ),
                 ),
-              ),
-              actions: <Widget>[
-                TextButton(
-                  onPressed: isSaving
-                      ? null
-                      : () => Navigator.of(dialogContext).pop(),
-                  child: const Text('Cancel'),
-                ),
-                ElevatedButton(
-                  onPressed: isSaving ? null : () => submit(setState),
-                  child: Text(isSaving ? 'Saving...' : 'Update goal'),
-                ),
-              ],
-            );
-          },
+                actions: <Widget>[
+                  TextButton(
+                    onPressed: dialogState.isSaving
+                        ? null
+                        : () => Navigator.of(dialogContext).pop(),
+                    child: const Text('Cancel'),
+                  ),
+                  ElevatedButton(
+                    onPressed: dialogState.isSaving
+                        ? null
+                        : () => submit(dialogState),
+                    child: Text(
+                      dialogState.isSaving ? 'Saving...' : 'Update goal',
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
         );
       },
     );
@@ -678,6 +788,19 @@ class _GoalCard extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+class _GoalSavingsDialogUiState extends ChangeNotifier {
+  bool isSaving = false;
+
+  void setSaving(bool value) {
+    if (isSaving == value) {
+      return;
+    }
+
+    isSaving = value;
+    notifyListeners();
   }
 }
 
