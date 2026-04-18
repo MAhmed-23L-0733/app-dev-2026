@@ -7,6 +7,7 @@ import 'auth/signin.dart';
 import 'auth/signup.dart';
 import 'firebase_options.dart';
 import 'screens/main_wrapper.dart';
+import 'screens/splash_screen.dart'; // Added splash screen import
 import 'theme_controller.dart';
 
 Future<void> main() async {
@@ -17,17 +18,6 @@ Future<void> main() async {
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
-
-  Widget _buildInitialScreen() {
-    final User? user = FirebaseAuth.instance.currentUser;
-    final String? uid = user?.uid;
-
-    if (uid == null || uid.isEmpty) {
-      return const SignInScreen();
-    }
-
-    return const MainWrapperScreen();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -40,7 +30,7 @@ class MyApp extends StatelessWidget {
           themeMode: themeMode,
           theme: _buildTheme(Brightness.light),
           darkTheme: _buildTheme(Brightness.dark),
-          home: _buildInitialScreen(),
+          home: const SplashScreen(), // Point home to the new Splash Screen
           routes: <String, WidgetBuilder>{
             SignInScreen.routeName: (_) => const SignInScreen(),
             SignUpScreen.routeName: (_) => const SignUpScreen(),
