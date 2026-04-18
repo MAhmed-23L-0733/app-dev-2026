@@ -21,6 +21,7 @@ class _GoalsViewState extends State<GoalsView> {
   final TextEditingController _deadlineController = TextEditingController();
   DateTime? _deadline;
   bool _isSaving = false;
+  bool _isDeadlinePickerExpanded = false;
 
   @override
   void dispose() {
@@ -28,38 +29,6 @@ class _GoalsViewState extends State<GoalsView> {
     _targetController.dispose();
     _deadlineController.dispose();
     super.dispose();
-  }
-
-  Future<void> _pickDeadline() async {
-    final DateTime now = DateTime.now();
-    final DateTime minimumDate = DateTime(now.year, now.month, now.day);
-    final DateTime? selectedDeadline = _deadline;
-    final DateTime normalizedSelectedDeadline = selectedDeadline == null
-        ? minimumDate.add(const Duration(days: 30))
-        : _startOfDay(selectedDeadline);
-    final DateTime initialDate =
-        normalizedSelectedDeadline.isBefore(minimumDate)
-        ? minimumDate
-        : normalizedSelectedDeadline;
-
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: initialDate,
-      firstDate: minimumDate,
-      lastDate: DateTime(now.year + 10),
-      selectableDayPredicate: (DateTime day) {
-        return !_startOfDay(day).isBefore(minimumDate);
-      },
-    );
-
-    if (picked == null) {
-      return;
-    }
-
-    setState(() {
-      _deadline = picked;
-      _deadlineController.text = _formatDate(picked);
-    });
   }
 
   Future<void> _saveGoal(String currencyCode) async {
@@ -261,16 +230,10 @@ class _GoalsViewState extends State<GoalsView> {
                                         },
                                       ),
                                       const SizedBox(height: 16),
-                                      TextFormField(
-                                        controller: _deadlineController,
-                                        readOnly: true,
-                                        onTap: _pickDeadline,
-                                        decoration: const InputDecoration(
-                                          labelText: 'Deadline',
-                                          prefixIcon: Icon(Icons.event_rounded),
-                                        ),
-                                        validator: (String? value) {
-                                          if (_deadline == null) {
+                                      FormField<DateTime>(
+                                        initialValue: _deadline,
+                                        validator: (DateTime? value) {
+                                          if (value == null) {
                                             return 'Choose a deadline.';
                                           }
 
@@ -278,12 +241,119 @@ class _GoalsViewState extends State<GoalsView> {
                                             DateTime.now(),
                                           );
                                           if (_startOfDay(
-                                            _deadline!,
+                                            value,
                                           ).isBefore(today)) {
                                             return 'Deadline cannot be older than today.';
                                           }
 
                                           return null;
+                                        },
+                                        builder: (FormFieldState<DateTime> field) {
+                                          final DateTime today = _startOfDay(
+                                            DateTime.now(),
+                                          );
+                                          final DateTime initialDate =
+                                              _deadline != null &&
+                                                  !_startOfDay(
+                                                    _deadline!,
+                                                  ).isBefore(today)
+                                              ? _startOfDay(_deadline!)
+                                              : today;
+
+                                          return Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: <Widget>[
+                                              InkWell(
+                                                borderRadius:
+                                                    BorderRadius.circular(18),
+                                                onTap: () {
+                                                  setState(() {
+                                                    _isDeadlinePickerExpanded =
+                                                        !_isDeadlinePickerExpanded;
+                                                  });
+                                                },
+                                                child: InputDecorator(
+                                                  decoration: InputDecoration(
+                                                    labelText: 'Deadline',
+                                                    prefixIcon: const Icon(
+                                                      Icons.event_rounded,
+                                                    ),
+                                                    suffixIcon: Icon(
+                                                      _isDeadlinePickerExpanded
+                                                          ? Icons
+                                                                .expand_less_rounded
+                                                          : Icons
+                                                                .expand_more_rounded,
+                                                    ),
+                                                    errorText: field.errorText,
+                                                  ),
+                                                  child: Text(
+                                                    _deadline == null
+                                                        ? 'Tap to choose a deadline'
+                                                        : _formatDate(
+                                                            _deadline!,
+                                                          ),
+                                                    style: Theme.of(
+                                                      context,
+                                                    ).textTheme.bodyMedium,
+                                                  ),
+                                                ),
+                                              ),
+                                              AnimatedCrossFade(
+                                                firstChild:
+                                                    const SizedBox.shrink(),
+                                                secondChild: Padding(
+                                                  padding:
+                                                      const EdgeInsets.only(
+                                                        top: 12,
+                                                      ),
+                                                  child: SizedBox(
+                                                    height: 330,
+                                                    child: CalendarDatePicker(
+                                                      initialDate: initialDate,
+                                                      firstDate: today,
+                                                      lastDate: DateTime(
+                                                        today.year + 10,
+                                                      ),
+                                                      onDateChanged: (DateTime selected) {
+                                                        final DateTime
+                                                        normalizedSelected =
+                                                            _startOfDay(
+                                                              selected,
+                                                            );
+                                                        if (normalizedSelected
+                                                            .isBefore(today)) {
+                                                          return;
+                                                        }
+
+                                                        setState(() {
+                                                          _deadline =
+                                                              normalizedSelected;
+                                                          _deadlineController
+                                                              .text = _formatDate(
+                                                            normalizedSelected,
+                                                          );
+                                                          _isDeadlinePickerExpanded =
+                                                              false;
+                                                        });
+                                                        field.didChange(
+                                                          normalizedSelected,
+                                                        );
+                                                      },
+                                                    ),
+                                                  ),
+                                                ),
+                                                crossFadeState:
+                                                    _isDeadlinePickerExpanded
+                                                    ? CrossFadeState.showSecond
+                                                    : CrossFadeState.showFirst,
+                                                duration: const Duration(
+                                                  milliseconds: 220,
+                                                ),
+                                              ),
+                                            ],
+                                          );
                                         },
                                       ),
                                       const SizedBox(height: 20),
@@ -446,7 +516,14 @@ class _GoalCard extends StatelessWidget {
     await showDialog<void>(
       context: context,
       builder: (BuildContext dialogContext) {
-        final double remainingBase = goal.targetAmount - goal.currentAmount;
+        // Calculate target and current amounts in display currency for accurate validation
+        final double currentDisplayAmount = CurrencyPreferenceController
+            .instance
+            .fromBaseAmount(goal.currentAmount, currencyCode);
+        final double targetDisplayAmount = CurrencyPreferenceController.instance
+            .fromBaseAmount(goal.targetAmount, currencyCode);
+        final double remainingDisplay =
+            targetDisplayAmount - currentDisplayAmount;
 
         return StatefulBuilder(
           builder: (BuildContext context, StateSetter setState) {
@@ -472,15 +549,12 @@ class _GoalCard extends StatelessWidget {
                     if (amount == null || amount <= 0) {
                       return 'Enter a valid amount.';
                     }
-                    final double enteredAmountBase =
-                        CurrencyPreferenceController.instance.toBaseAmount(
-                          amount,
-                          currencyCode,
-                        );
-                    if (enteredAmountBase > availableNetBase + 0.000001) {
+
+                    // Directly compare the entered amount against the display limits seen by the user
+                    if (amount > availableNetDisplay + 0.000001) {
                       return 'Amount is greater than the current net value.';
                     }
-                    if (enteredAmountBase > remainingBase + 0.000001) {
+                    if (amount > remainingDisplay + 0.000001) {
                       return 'Amount is greater than the remaining target.';
                     }
                     return null;

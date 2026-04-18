@@ -176,11 +176,54 @@ class BudgetFirestoreService {
   }
 
   Future<double> getCurrentMonthNetTotal(User user) async {
-    final DocumentSnapshot<Map<String, dynamic>> snapshot =
-        await _monthlySummaries(user).doc(_monthKey(DateTime.now())).get();
+    final DateTime now = DateTime.now();
+    final DateTime startOfMonth = DateTime(now.year, now.month);
+    final DateTime startOfNextMonth = DateTime(now.year, now.month + 1);
 
-    final Map<String, dynamic>? data = snapshot.data();
-    return (data?['netTotal'] as num? ?? 0).toDouble();
+    final QuerySnapshot<Map<String, dynamic>> transactionsSnapshot = await _transactions(
+      user,
+    )
+        .where(
+          'timestamp',
+          isGreaterThanOrEqualTo: Timestamp.fromDate(startOfMonth),
+        )
+        .where('timestamp', isLessThan: Timestamp.fromDate(startOfNextMonth))
+        .get();
+
+    if (transactionsSnapshot.docs.isNotEmpty) {
+      final double incomeTotal = transactionsSnapshot.docs
+          .where(
+            (QueryDocumentSnapshot<Map<String, dynamic>> doc) =>
+                (doc.data()['type'] as String?) == 'income',
+          )
+          .fold<double>(
+            0,
+            (double total, QueryDocumentSnapshot<Map<String, dynamic>> doc) {
+              return total + (doc.data()['amount'] as num? ?? 0).toDouble();
+            },
+          );
+      final double expenseTotal = transactionsSnapshot.docs
+          .where(
+            (QueryDocumentSnapshot<Map<String, dynamic>> doc) =>
+                (doc.data()['type'] as String?) != 'income',
+          )
+          .fold<double>(
+            0,
+            (double total, QueryDocumentSnapshot<Map<String, dynamic>> doc) {
+              return total + (doc.data()['amount'] as num? ?? 0).toDouble();
+            },
+          );
+
+      return incomeTotal - expenseTotal;
+    }
+
+    final DocumentSnapshot<Map<String, dynamic>> summarySnapshot =
+        await _monthlySummaries(user).doc(_monthKey(now)).get();
+    final Map<String, dynamic>? data = summarySnapshot.data();
+    final double incomeTotal = (data?['incomeTotal'] as num? ?? 0).toDouble();
+    final double expenseTotal = (data?['expenseTotal'] as num? ?? 0).toDouble();
+
+    return (data?['netTotal'] as num?)?.toDouble() ?? (incomeTotal - expenseTotal);
   }
 
   Future<void> addSavingsToGoal({
@@ -194,47 +237,35 @@ class BudgetFirestoreService {
     final DocumentReference<Map<String, dynamic>> goalRef = _goals(
       user,
     ).doc(goalId);
-    final DocumentReference<Map<String, dynamic>> summaryRef =
-        _monthlySummaries(user).doc(_monthKey(DateTime.now()));
+    final double netTotal = await getCurrentMonthNetTotal(user);
+
+    if (amountInBase > netTotal) {
+      throw FirebaseException(
+        plugin: 'cloud_firestore',
+        code: 'insufficient-net-balance',
+        message: 'Savings amount is greater than the current net value.',
+      );
+    }
 
     await FirebaseFirestore.instance.runTransaction<void>((
       Transaction transaction,
     ) async {
       final DocumentSnapshot<Map<String, dynamic>> goalSnapshot =
           await transaction.get(goalRef);
-      final DocumentSnapshot<Map<String, dynamic>> summarySnapshot =
-          await transaction.get(summaryRef);
 
       final Map<String, dynamic> goalData =
           goalSnapshot.data() ?? <String, dynamic>{};
-      final Map<String, dynamic> summaryData =
-          summarySnapshot.data() ?? <String, dynamic>{};
 
       final double currentAmount = (goalData['currentAmount'] as num? ?? 0)
           .toDouble();
       final double targetAmount = (goalData['targetAmount'] as num? ?? 0)
           .toDouble();
-      final double incomeTotal = (summaryData['incomeTotal'] as num? ?? 0)
-          .toDouble();
-      final double expenseTotal = (summaryData['expenseTotal'] as num? ?? 0)
-          .toDouble();
-      final double netTotal =
-          (summaryData['netTotal'] as num?)?.toDouble() ??
-          (incomeTotal - expenseTotal);
 
       if (amountInBase <= 0) {
         throw FirebaseException(
           plugin: 'cloud_firestore',
           code: 'invalid-amount',
           message: 'Enter a valid savings amount.',
-        );
-      }
-
-      if (amountInBase > netTotal) {
-        throw FirebaseException(
-          plugin: 'cloud_firestore',
-          code: 'insufficient-net-balance',
-          message: 'Savings amount is greater than the current net value.',
         );
       }
 
