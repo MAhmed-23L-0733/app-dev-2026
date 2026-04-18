@@ -529,7 +529,11 @@ class _SignInScreenState extends State<SignInScreen> {
 
       final User? user = credential.user;
       if (user != null) {
-        await UserProfileService.instance.ensureUserDocumentSafely(user: user);
+        final bool synced = await UserProfileService.instance
+            .ensureUserDocumentSafely(user: user);
+        if (!synced && mounted) {
+          _showMessage('Signed in, but Firebase sync needs attention.');
+        }
       }
 
       if (!mounted) {
@@ -566,7 +570,11 @@ class _SignInScreenState extends State<SignInScreen> {
 
       final User? user = credential.user;
       if (user != null) {
-        await UserProfileService.instance.ensureUserDocumentSafely(user: user);
+        final bool synced = await UserProfileService.instance
+            .ensureUserDocumentSafely(user: user);
+        if (!synced && mounted) {
+          _showMessage('Signed in, but Firebase sync needs attention.');
+        }
       }
 
       if (!mounted) {
@@ -855,10 +863,14 @@ class _SignUpScreenState extends State<SignUpScreen> {
         await user.updateDisplayName(name);
         await user.reload();
         final User? refreshedUser = FirebaseAuth.instance.currentUser;
-        await UserProfileService.instance.ensureUserDocumentSafely(
-          user: refreshedUser ?? user,
-          preferredName: name,
-        );
+        final bool synced = await UserProfileService.instance
+            .ensureUserDocumentSafely(
+              user: refreshedUser ?? user,
+              preferredName: name,
+            );
+        if (!synced && mounted) {
+          _showMessage('Account created, but Firebase sync needs attention.');
+        }
       }
 
       if (!mounted) {
@@ -893,7 +905,11 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
       final User? user = credential.user;
       if (user != null) {
-        await UserProfileService.instance.ensureUserDocumentSafely(user: user);
+        final bool synced = await UserProfileService.instance
+            .ensureUserDocumentSafely(user: user);
+        if (!synced && mounted) {
+          _showMessage('Account created, but Firebase sync needs attention.');
+        }
       }
 
       if (!mounted) {
@@ -1165,10 +1181,12 @@ FILE PATH: lib\auth\user_profile_service.dart
 ========================================
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
+
+import '../services/budget_firestore_service.dart';
 
 class UserProfileService {
   const UserProfileService._();
-
   static const UserProfileService instance = UserProfileService._();
 
   Future<void> ensureUserDocument({
@@ -1181,43 +1199,33 @@ class UserProfileService {
         .doc(user.uid);
 
     final String name = _resolveName(user, preferredName);
-    final DocumentSnapshot<Map<String, dynamic>> snapshot = await ref.get();
-
-    if (!snapshot.exists) {
-      await ref.set(<String, dynamic>{
-        'uid': user.uid,
-        'name': name,
-        'email': user.email,
-        'photoUrl': user.photoURL,
-        'providerIds': user.providerData
-            .map((UserInfo info) => info.providerId)
-            .where((String id) => id.isNotEmpty)
-            .toList(),
-        'createdAt': FieldValue.serverTimestamp(),
-        'lastSignInAt': FieldValue.serverTimestamp(),
-      });
-      return;
-    }
+    final Timestamp createdAt = Timestamp.fromDate(
+      user.metadata.creationTime ?? DateTime.now(),
+    );
 
     await ref.set(<String, dynamic>{
-      'name': name,
-      'email': user.email,
-      'photoUrl': user.photoURL,
-      'providerIds': user.providerData
-          .map((UserInfo info) => info.providerId)
-          .where((String id) => id.isNotEmpty)
-          .toList(),
+      'email': user.email ?? '',
+      'displayName': name,
+      'photoURL': user.photoURL ?? '',
+      'createdAt': createdAt,
       'lastSignInAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
+
+    await BudgetFirestoreService.instance.ensureBudgetNodes(user: user);
   }
 
-  Future<void> ensureUserDocumentSafely({
+  Future<bool> ensureUserDocumentSafely({
     required User user,
     String? preferredName,
   }) async {
     try {
       await ensureUserDocument(user: user, preferredName: preferredName);
-    } catch (_) {}
+      return true;
+    } catch (error, stackTrace) {
+      debugPrint('Firestore profile sync failed: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      return false;
+    }
   }
 
   String _resolveName(User user, String? preferredName) {
@@ -1244,52 +1252,221 @@ class UserProfileService {
 
 
 ========================================
-FILE PATH: lib\models\transaction.dart
+FILE PATH: lib\models\goal.dart
 ========================================
-enum TransactionType { income, expense }
+import 'package:cloud_firestore/cloud_firestore.dart';
 
-class Transaction {
+class GoalModel {
   final String id;
   final String title;
-  final double amount;
-  final DateTime date;
-  final String category;
-  final TransactionType type;
+  final double targetAmount;
+  final double currentAmount;
+  final Timestamp deadline;
 
-  Transaction({
+  GoalModel({
     required this.id,
     required this.title,
-    required this.amount,
-    required this.date,
-    required this.category,
-    required this.type,
+    required this.targetAmount,
+    required this.currentAmount,
+    required this.deadline,
   });
+
+  Map<String, dynamic> toMap() {
+    return {
+      'title': title,
+      'targetAmount': targetAmount,
+      'currentAmount': currentAmount,
+      'deadline': deadline,
+    };
+  }
+
+  factory GoalModel.fromFirestore(DocumentSnapshot doc) {
+    final Map<String, dynamic> data =
+        (doc.data() as Map<String, dynamic>?) ?? <String, dynamic>{};
+    return GoalModel(
+      id: doc.id,
+      title: data['title'] as String? ?? '',
+      targetAmount: (data['targetAmount'] as num? ?? 0).toDouble(),
+      currentAmount: (data['currentAmount'] as num? ?? 0).toDouble(),
+      deadline: data['deadline'] as Timestamp? ?? Timestamp.now(),
+    );
+  }
 }
 
 
 
 
 ========================================
-FILE PATH: lib\screens\home.dart
+FILE PATH: lib\models\insight.dart
 ========================================
-// ignore_for_file: deprecated_member_use
+import 'package:cloud_firestore/cloud_firestore.dart';
 
+class InsightModel {
+  final String id;
+  final String content;
+  final Timestamp generatedAt;
+
+  InsightModel({
+    required this.id,
+    required this.content,
+    required this.generatedAt,
+  });
+
+  Map<String, dynamic> toMap() {
+    return {'content': content, 'generatedAt': generatedAt};
+  }
+
+  factory InsightModel.fromFirestore(DocumentSnapshot doc) {
+    final Map<String, dynamic> data =
+        (doc.data() as Map<String, dynamic>?) ?? <String, dynamic>{};
+    return InsightModel(
+      id: doc.id,
+      content: data['content'] as String? ?? '',
+      generatedAt: data['generatedAt'] as Timestamp? ?? Timestamp.now(),
+    );
+  }
+}
+
+
+
+
+========================================
+FILE PATH: lib\models\transaction.dart
+========================================
+import 'package:cloud_firestore/cloud_firestore.dart';
+
+class TransactionModel {
+  final String id;
+  final double amount;
+  final String type; // 'income' | 'expense'
+  final String category; // Manual tag
+  final String aiCategory; // AI tag
+  final String note;
+  final Timestamp timestamp;
+
+  TransactionModel({
+    required this.id,
+    required this.amount,
+    required this.type,
+    required this.category,
+    required this.aiCategory,
+    required this.note,
+    required this.timestamp,
+  });
+
+  Map<String, dynamic> toMap() {
+    return {
+      'amount': amount,
+      'type': type,
+      'category': category,
+      'aiCategory': aiCategory,
+      'note': note,
+      'timestamp': timestamp,
+    };
+  }
+
+  factory TransactionModel.fromFirestore(DocumentSnapshot doc) {
+    final Map<String, dynamic> data =
+        (doc.data() as Map<String, dynamic>?) ?? <String, dynamic>{};
+    return TransactionModel(
+      id: doc.id,
+      amount: (data['amount'] as num? ?? 0).toDouble(),
+      type: data['type'] as String? ?? 'expense',
+      category: data['category'] as String? ?? '',
+      aiCategory: data['aiCategory'] as String? ?? '',
+      note: data['note'] as String? ?? '',
+      timestamp: data['timestamp'] as Timestamp? ?? Timestamp.now(),
+    );
+  }
+}
+
+
+
+
+========================================
+FILE PATH: lib\screens\add_transaction.dart
+========================================
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
+import '../services/budget_firestore_service.dart';
 import '../widgets/neon_surface.dart';
 
-class HomeView extends StatelessWidget {
-  const HomeView({super.key});
+class AddTransactionView extends StatefulWidget {
+  const AddTransactionView({super.key});
+
+  @override
+  State<AddTransactionView> createState() => _AddTransactionViewState();
+}
+
+class _AddTransactionViewState extends State<AddTransactionView> {
+  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+  final TextEditingController _amountController = TextEditingController();
+  final TextEditingController _noteController = TextEditingController();
+  final TextEditingController _categoryController = TextEditingController();
+  String _selectedType = 'expense';
+  bool _isSaving = false;
+
+  @override
+  void dispose() {
+    _amountController.dispose();
+    _noteController.dispose();
+    _categoryController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _saveTransaction() async {
+    if (!(_formKey.currentState?.validate() ?? false)) {
+      return;
+    }
+
+    final User? user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      _showMessage('Sign in again to continue.');
+      return;
+    }
+
+    setState(() {
+      _isSaving = true;
+    });
+
+    try {
+      await BudgetFirestoreService.instance.addTransaction(
+        user: user,
+        amount: double.parse(_amountController.text.trim()),
+        type: _selectedType,
+        category: _categoryController.text.trim(),
+        note: _noteController.text.trim(),
+      );
+
+      _amountController.clear();
+      _noteController.clear();
+      _categoryController.clear();
+
+      if (!mounted) {
+        return;
+      }
+
+      _showMessage('Transaction saved to Firebase.');
+    } catch (_) {
+      _showMessage('Unable to save the transaction right now.');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSaving = false;
+        });
+      }
+    }
+  }
+
+  void _showMessage(String message) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
 
   @override
   Widget build(BuildContext context) {
-    final User? user = FirebaseAuth.instance.currentUser;
-    final String name = _displayName(user);
-    final String email = user?.email ?? 'No email linked';
-    final String provider = _providerLabel(user);
-    final String joined = _formatDate(user?.metadata.creationTime);
-    final String lastSignIn = _formatDate(user?.metadata.lastSignInTime);
     final Color onSurface = Theme.of(context).colorScheme.onSurface;
 
     return SingleChildScrollView(
@@ -1301,103 +1478,105 @@ class HomeView extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                Row(
-                  children: <Widget>[
-                    Container(
-                      width: 58,
-                      height: 58,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: LinearGradient(
-                          colors: <Color>[
-                            Theme.of(context).colorScheme.primary,
-                            Colors.blueAccent,
-                          ],
-                        ),
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        _initials(user),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 20,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: <Widget>[
-                          Text(
-                            'Welcome back, $name',
-                            style: Theme.of(context).textTheme.headlineMedium
-                                ?.copyWith(
-                                  fontWeight: FontWeight.w800,
-                                  color: onSurface,
-                                ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            email,
-                            style: Theme.of(context).textTheme.bodyMedium
-                                ?.copyWith(color: onSurface.withOpacity(0.74)),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+                Text(
+                  'Add transaction',
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: onSurface,
+                  ),
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Signed in through Firebase Auth and ready to use your live account data.',
+                  'Track every income and expense so your monthly totals stay live.',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: onSurface.withOpacity(0.74),
+                    color: onSurface.withOpacity(0.7),
                   ),
                 ),
                 const SizedBox(height: 20),
-                Row(
-                  children: <Widget>[
-                    Expanded(
-                      child: _MetricTile(
-                        label: 'Verified',
-                        value: user?.emailVerified == true ? 'Yes' : 'No',
-                        icon: Icons.verified_rounded,
+                Form(
+                  key: _formKey,
+                  child: Column(
+                    children: <Widget>[
+                      Wrap(
+                        spacing: 12,
+                        children: <Widget>[
+                          ChoiceChip(
+                            label: const Text('Expense'),
+                            selected: _selectedType == 'expense',
+                            onSelected: (_) {
+                              setState(() {
+                                _selectedType = 'expense';
+                              });
+                            },
+                          ),
+                          ChoiceChip(
+                            label: const Text('Income'),
+                            selected: _selectedType == 'income',
+                            onSelected: (_) {
+                              setState(() {
+                                _selectedType = 'income';
+                              });
+                            },
+                          ),
+                        ],
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _MetricTile(
-                        label: 'Provider',
-                        value: provider,
-                        icon: Icons.manage_accounts_rounded,
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: _amountController,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        decoration: const InputDecoration(
+                          labelText: 'Amount',
+                          prefixIcon: Icon(Icons.attach_money_rounded),
+                        ),
+                        validator: (String? value) {
+                          final String text = value?.trim() ?? '';
+                          final double? amount = double.tryParse(text);
+                          if (amount == null || amount <= 0) {
+                            return 'Enter a valid amount.';
+                          }
+                          return null;
+                        },
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: _categoryController,
+                        textCapitalization: TextCapitalization.words,
+                        decoration: const InputDecoration(
+                          labelText: 'Category',
+                          prefixIcon: Icon(Icons.sell_rounded),
+                        ),
+                        validator: (String? value) {
+                          if ((value ?? '').trim().isEmpty) {
+                            return 'Enter a category.';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: _noteController,
+                        textCapitalization: TextCapitalization.sentences,
+                        maxLines: 3,
+                        decoration: const InputDecoration(
+                          labelText: 'Note',
+                          prefixIcon: Icon(Icons.notes_rounded),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      ElevatedButton.icon(
+                        onPressed: _isSaving ? null : _saveTransaction,
+                        icon: const Icon(Icons.save_rounded),
+                        label: Text(
+                          _isSaving ? 'Saving...' : 'Save transaction',
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: <Widget>[
-              Expanded(
-                child: _ActionChipCard(
-                  icon: Icons.login_rounded,
-                  title: 'Last sign-in',
-                  subtitle: lastSignIn,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _ActionChipCard(
-                  icon: Icons.calendar_today_rounded,
-                  title: 'Joined',
-                  subtitle: joined,
-                ),
-              ),
-            ],
           ),
           const SizedBox(height: 16),
           GlassCard(
@@ -1405,37 +1584,698 @@ class HomeView extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
                 Text(
-                  'Account activity',
+                  'Tips',
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.w800,
                     color: onSurface,
                   ),
                 ),
-                const SizedBox(height: 14),
-                _ActivityRow(
-                  icon: Icons.person_rounded,
-                  title: 'Signed in as $name',
-                  subtitle: email,
-                ),
                 const SizedBox(height: 12),
-                _ActivityRow(
-                  icon: Icons.verified_user_rounded,
-                  title: 'Authentication provider',
-                  subtitle: provider,
-                ),
-                const SizedBox(height: 12),
-                _ActivityRow(
-                  icon: Icons.sync_rounded,
-                  title: 'Email verification',
-                  subtitle: user?.emailVerified == true
-                      ? 'Verified'
-                      : 'Not verified',
+                Text(
+                  'Income raises your available balance. Expenses update the monthly spendings card on the dashboard immediately after sync.',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: onSurface.withOpacity(0.7),
+                  ),
                 ),
               ],
             ),
           ),
         ],
       ),
+    );
+  }
+}
+
+
+
+
+========================================
+FILE PATH: lib\screens\goals.dart
+========================================
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
+
+import '../models/goal.dart';
+import '../services/budget_firestore_service.dart';
+import '../widgets/neon_surface.dart';
+
+class GoalsView extends StatefulWidget {
+  const GoalsView({super.key});
+
+  @override
+  State<GoalsView> createState() => _GoalsViewState();
+}
+
+class _GoalsViewState extends State<GoalsView> {
+  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+  final TextEditingController _titleController = TextEditingController();
+  final TextEditingController _targetController = TextEditingController();
+  final TextEditingController _deadlineController = TextEditingController();
+  DateTime? _deadline;
+  bool _isSaving = false;
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _targetController.dispose();
+    _deadlineController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickDeadline() async {
+    final DateTime now = DateTime.now();
+    final DateTime initialDate = _deadline ?? now.add(const Duration(days: 30));
+
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: initialDate,
+      firstDate: now,
+      lastDate: DateTime(now.year + 10),
+    );
+
+    if (picked == null) {
+      return;
+    }
+
+    setState(() {
+      _deadline = picked;
+      _deadlineController.text = _formatDate(picked);
+    });
+  }
+
+  Future<void> _saveGoal() async {
+    if (!(_formKey.currentState?.validate() ?? false)) {
+      return;
+    }
+
+    final User? user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      _showMessage('Sign in again to continue.');
+      return;
+    }
+
+    final DateTime? deadline = _deadline;
+    if (deadline == null) {
+      _showMessage('Choose a deadline.');
+      return;
+    }
+
+    setState(() {
+      _isSaving = true;
+    });
+
+    try {
+      await BudgetFirestoreService.instance.addGoal(
+        user: user,
+        title: _titleController.text.trim(),
+        targetAmount: double.parse(_targetController.text.trim()),
+        deadline: deadline,
+      );
+
+      _titleController.clear();
+      _targetController.clear();
+      _deadlineController.clear();
+      _deadline = null;
+
+      if (!mounted) {
+        return;
+      }
+
+      _showMessage('Goal saved to Firebase.');
+    } catch (_) {
+      _showMessage('Unable to save the goal right now.');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSaving = false;
+        });
+      }
+    }
+  }
+
+  void _showMessage(String message) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final User? user = FirebaseAuth.instance.currentUser;
+    final Color onSurface = Theme.of(context).colorScheme.onSurface;
+
+    if (user == null) {
+      return Center(
+        child: Text(
+          'Sign in to manage goals.',
+          style: Theme.of(
+            context,
+          ).textTheme.titleMedium?.copyWith(color: onSurface),
+        ),
+      );
+    }
+
+    return StreamBuilder<List<GoalModel>>(
+      stream: BudgetFirestoreService.instance.watchGoals(user),
+      builder: (BuildContext context, AsyncSnapshot<List<GoalModel>> snapshot) {
+        final List<GoalModel> goals = snapshot.data ?? <GoalModel>[];
+
+        return SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 120),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              GlassCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      'Goals',
+                      style: Theme.of(context).textTheme.headlineSmall
+                          ?.copyWith(
+                            fontWeight: FontWeight.w800,
+                            color: onSurface,
+                          ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Set clear targets and track them alongside your monthly budget.',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: onSurface.withOpacity(0.7),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Form(
+                      key: _formKey,
+                      child: Column(
+                        children: <Widget>[
+                          TextFormField(
+                            controller: _titleController,
+                            textCapitalization: TextCapitalization.words,
+                            decoration: const InputDecoration(
+                              labelText: 'Goal title',
+                              prefixIcon: Icon(Icons.flag_rounded),
+                            ),
+                            validator: (String? value) {
+                              if ((value ?? '').trim().isEmpty) {
+                                return 'Enter a goal title.';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 16),
+                          TextFormField(
+                            controller: _targetController,
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
+                            decoration: const InputDecoration(
+                              labelText: 'Target amount',
+                              prefixIcon: Icon(Icons.savings_rounded),
+                            ),
+                            validator: (String? value) {
+                              final double? amount = double.tryParse(
+                                value?.trim() ?? '',
+                              );
+                              if (amount == null || amount <= 0) {
+                                return 'Enter a valid target amount.';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 16),
+                          TextFormField(
+                            controller: _deadlineController,
+                            readOnly: true,
+                            onTap: _pickDeadline,
+                            decoration: const InputDecoration(
+                              labelText: 'Deadline',
+                              prefixIcon: Icon(Icons.event_rounded),
+                            ),
+                            validator: (String? value) {
+                              if (_deadline == null) {
+                                return 'Choose a deadline.';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 20),
+                          ElevatedButton.icon(
+                            onPressed: _isSaving ? null : _saveGoal,
+                            icon: const Icon(Icons.add_task_rounded),
+                            label: Text(_isSaving ? 'Saving...' : 'Save goal'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              GlassCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      'Saved goals',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        color: onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    if (snapshot.connectionState == ConnectionState.waiting)
+                      const Center(
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(vertical: 24),
+                          child: CircularProgressIndicator(),
+                        ),
+                      )
+                    else if (goals.isEmpty)
+                      Text(
+                        'No goals yet. Add one to start tracking progress.',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: onSurface.withOpacity(0.7),
+                        ),
+                      )
+                    else
+                      Column(
+                        children: goals
+                            .map(
+                              (GoalModel goal) => Padding(
+                                padding: const EdgeInsets.only(bottom: 12),
+                                child: _GoalCard(goal: goal),
+                              ),
+                            )
+                            .toList(),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _GoalCard extends StatelessWidget {
+  const _GoalCard({required this.goal});
+
+  final GoalModel goal;
+
+  @override
+  Widget build(BuildContext context) {
+    final Color onSurface = Theme.of(context).colorScheme.onSurface;
+    final double ratio = goal.targetAmount <= 0
+        ? 0
+        : (goal.currentAmount / goal.targetAmount).clamp(0.0, 1.0);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: Text(
+                  goal.title,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: onSurface,
+                  ),
+                ),
+              ),
+              Text(
+                '${(ratio * 100).toStringAsFixed(0)}%',
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: LinearProgressIndicator(value: ratio, minHeight: 8),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            '${goal.currentAmount.toStringAsFixed(2)} / ${goal.targetAmount.toStringAsFixed(2)}',
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: onSurface.withOpacity(0.7)),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Deadline ${_formatDate(goal.deadline.toDate())}',
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: onSurface.withOpacity(0.6)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+String _formatDate(DateTime value) {
+  const List<String> months = <String>[
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
+
+  return '${months[value.month - 1]} ${value.day}, ${value.year}';
+}
+
+
+
+
+========================================
+FILE PATH: lib\screens\home.dart
+========================================
+// ignore_for_file: deprecated_member_use
+
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
+
+import '../models/transaction.dart';
+import '../services/budget_firestore_service.dart';
+import '../widgets/neon_surface.dart';
+
+class HomeView extends StatelessWidget {
+  const HomeView({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final User? user = FirebaseAuth.instance.currentUser;
+    final Color onSurface = Theme.of(context).colorScheme.onSurface;
+
+    if (user == null) {
+      return Center(
+        child: Text(
+          'Sign in to view your budget dashboard.',
+          style: Theme.of(
+            context,
+          ).textTheme.titleMedium?.copyWith(color: onSurface),
+        ),
+      );
+    }
+
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream: BudgetFirestoreService.instance.watchMonthlySummary(user),
+      builder:
+          (
+            BuildContext context,
+            AsyncSnapshot<DocumentSnapshot<Map<String, dynamic>>>
+            summarySnapshot,
+          ) {
+            final _BudgetSummary summary = _BudgetSummary.fromMap(
+              summarySnapshot.data?.data(),
+            );
+
+            return StreamBuilder<List<TransactionModel>>(
+              stream: BudgetFirestoreService.instance
+                  .watchCurrentMonthTransactions(user),
+              builder:
+                  (
+                    BuildContext context,
+                    AsyncSnapshot<List<TransactionModel>> transactionsSnapshot,
+                  ) {
+                    final List<TransactionModel> transactions =
+                        transactionsSnapshot.data ?? <TransactionModel>[];
+                    final double balance =
+                        summary.incomeTotal - summary.expenseTotal;
+
+                    return SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(20, 12, 20, 120),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: <Widget>[
+                          GlassCard(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: <Widget>[
+                                Row(
+                                  children: <Widget>[
+                                    Container(
+                                      width: 58,
+                                      height: 58,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        gradient: LinearGradient(
+                                          colors: <Color>[
+                                            Theme.of(
+                                              context,
+                                            ).colorScheme.primary,
+                                            Colors.blueAccent,
+                                          ],
+                                        ),
+                                      ),
+                                      alignment: Alignment.center,
+                                      child: Text(
+                                        _initials(user),
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 20,
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 14),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: <Widget>[
+                                          Text(
+                                            'Monthly budget dashboard',
+                                            style: Theme.of(context)
+                                                .textTheme
+                                                .headlineMedium
+                                                ?.copyWith(
+                                                  fontWeight: FontWeight.w800,
+                                                  color: onSurface,
+                                                ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            _displayName(user),
+                                            style: Theme.of(context)
+                                                .textTheme
+                                                .bodyMedium
+                                                ?.copyWith(
+                                                  color: onSurface.withOpacity(
+                                                    0.74,
+                                                  ),
+                                                ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 18),
+                                Text(
+                                  'Total monthly spendings',
+                                  style: Theme.of(context).textTheme.labelLarge
+                                      ?.copyWith(
+                                        color: onSurface.withOpacity(0.7),
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  _formatMoney(summary.expenseTotal),
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .displaySmall
+                                      ?.copyWith(
+                                        fontWeight: FontWeight.w900,
+                                        color: onSurface,
+                                      ),
+                                ),
+                                const SizedBox(height: 10),
+                                Text(
+                                  'Updated for ${summary.monthLabel}',
+                                  style: Theme.of(context).textTheme.bodyMedium
+                                      ?.copyWith(
+                                        color: onSurface.withOpacity(0.72),
+                                      ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          Row(
+                            children: <Widget>[
+                              Expanded(
+                                child: _MetricTile(
+                                  label: 'Income',
+                                  value: _formatMoney(summary.incomeTotal),
+                                  icon: Icons.trending_up_rounded,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: _MetricTile(
+                                  label: 'Spendings',
+                                  value: _formatMoney(summary.expenseTotal),
+                                  icon: Icons.trending_down_rounded,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          GlassCard(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: <Widget>[
+                                Text(
+                                  'Net balance',
+                                  style: Theme.of(context).textTheme.titleLarge
+                                      ?.copyWith(
+                                        fontWeight: FontWeight.w800,
+                                        color: onSurface,
+                                      ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  _formatMoney(balance),
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .headlineMedium
+                                      ?.copyWith(
+                                        fontWeight: FontWeight.w900,
+                                        color: balance >= 0
+                                            ? Theme.of(
+                                                context,
+                                              ).colorScheme.primary
+                                            : Theme.of(
+                                                context,
+                                              ).colorScheme.error,
+                                      ),
+                                ),
+                                const SizedBox(height: 10),
+                                Text(
+                                  'Income minus spendings for the current month.',
+                                  style: Theme.of(context).textTheme.bodyMedium
+                                      ?.copyWith(
+                                        color: onSurface.withOpacity(0.72),
+                                      ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          GlassCard(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: <Widget>[
+                                Text(
+                                  'Recent transactions',
+                                  style: Theme.of(context).textTheme.titleLarge
+                                      ?.copyWith(
+                                        fontWeight: FontWeight.w800,
+                                        color: onSurface,
+                                      ),
+                                ),
+                                const SizedBox(height: 14),
+                                if (transactionsSnapshot.connectionState ==
+                                    ConnectionState.waiting)
+                                  const Center(
+                                    child: Padding(
+                                      padding: EdgeInsets.symmetric(
+                                        vertical: 24,
+                                      ),
+                                      child: CircularProgressIndicator(),
+                                    ),
+                                  )
+                                else if (transactions.isEmpty)
+                                  Text(
+                                    'No transactions added this month yet.',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodyMedium
+                                        ?.copyWith(
+                                          color: onSurface.withOpacity(0.7),
+                                        ),
+                                  )
+                                else
+                                  Column(
+                                    children: transactions
+                                        .take(6)
+                                        .map(
+                                          (TransactionModel transaction) =>
+                                              Padding(
+                                                padding: const EdgeInsets.only(
+                                                  bottom: 12,
+                                                ),
+                                                child: _TransactionRow(
+                                                  transaction: transaction,
+                                                ),
+                                              ),
+                                        )
+                                        .toList(),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+            );
+          },
+    );
+  }
+}
+
+class _BudgetSummary {
+  const _BudgetSummary({
+    required this.monthLabel,
+    required this.incomeTotal,
+    required this.expenseTotal,
+  });
+
+  final String monthLabel;
+  final double incomeTotal;
+  final double expenseTotal;
+
+  factory _BudgetSummary.fromMap(Map<String, dynamic>? data) {
+    final DateTime now = DateTime.now();
+    final String defaultMonthLabel = _monthLabel(now);
+    if (data == null) {
+      return _BudgetSummary(
+        monthLabel: defaultMonthLabel,
+        incomeTotal: 0,
+        expenseTotal: 0,
+      );
+    }
+
+    return _BudgetSummary(
+      monthLabel: data['monthLabel'] as String? ?? defaultMonthLabel,
+      incomeTotal: (data['incomeTotal'] as num? ?? 0).toDouble(),
+      expenseTotal: (data['expenseTotal'] as num? ?? 0).toDouble(),
     );
   }
 }
@@ -1477,38 +2317,7 @@ String _initials(User? user) {
       .toUpperCase();
 }
 
-String _providerLabel(User? user) {
-  final List<String> providers =
-      user?.providerData
-          .map((UserInfo info) => info.providerId)
-          .where((String providerId) => providerId.isNotEmpty)
-          .toSet()
-          .toList() ??
-      <String>[];
-
-  if (providers.isEmpty) {
-    return 'Email';
-  }
-
-  return providers
-      .map((String providerId) {
-        switch (providerId) {
-          case 'google.com':
-            return 'Google';
-          case 'password':
-            return 'Email';
-          default:
-            return providerId;
-        }
-      })
-      .join(', ');
-}
-
-String _formatDate(DateTime? value) {
-  if (value == null) {
-    return 'Unavailable';
-  }
-
+String _monthLabel(DateTime value) {
   const List<String> months = <String>[
     'Jan',
     'Feb',
@@ -1524,7 +2333,12 @@ String _formatDate(DateTime? value) {
     'Dec',
   ];
 
-  return '${months[value.month - 1]} ${value.day}, ${value.year}';
+  return '${months[value.month - 1]} ${value.year}';
+}
+
+String _formatMoney(double amount) {
+  final String prefix = amount < 0 ? '-' : '';
+  return '$prefix\$${amount.abs().toStringAsFixed(2)}';
 }
 
 class _MetricTile extends StatelessWidget {
@@ -1568,69 +2382,19 @@ class _MetricTile extends StatelessWidget {
   }
 }
 
-class _ActionChipCard extends StatelessWidget {
-  const _ActionChipCard({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-  });
+class _TransactionRow extends StatelessWidget {
+  const _TransactionRow({required this.transaction});
 
-  final IconData icon;
-  final String title;
-  final String subtitle;
+  final TransactionModel transaction;
 
   @override
   Widget build(BuildContext context) {
     final Color onSurface = Theme.of(context).colorScheme.onSurface;
-    return GlassCard(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: Theme.of(context).colorScheme.primary.withOpacity(0.16),
-            ),
-            child: Icon(icon, color: Theme.of(context).colorScheme.primary),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            title,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w800,
-              color: onSurface,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            subtitle,
-            style: Theme.of(
-              context,
-            ).textTheme.bodySmall?.copyWith(color: onSurface.withOpacity(0.72)),
-          ),
-        ],
-      ),
-    );
-  }
-}
+    final bool isIncome = transaction.type == 'income';
+    final Color accent = isIncome
+        ? Theme.of(context).colorScheme.primary
+        : Theme.of(context).colorScheme.error;
 
-class _ActivityRow extends StatelessWidget {
-  const _ActivityRow({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-  });
-
-  final IconData icon;
-  final String title;
-  final String subtitle;
-
-  @override
-  Widget build(BuildContext context) {
-    final Color onSurface = Theme.of(context).colorScheme.onSurface;
     return Row(
       children: <Widget>[
         Container(
@@ -1638,9 +2402,12 @@ class _ActivityRow extends StatelessWidget {
           height: 46,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: Theme.of(context).colorScheme.primary.withOpacity(0.14),
+            color: accent.withOpacity(0.14),
           ),
-          child: Icon(icon, color: Theme.of(context).colorScheme.primary),
+          child: Icon(
+            isIncome ? Icons.add_rounded : Icons.remove_rounded,
+            color: accent,
+          ),
         ),
         const SizedBox(width: 14),
         Expanded(
@@ -1648,7 +2415,7 @@ class _ActivityRow extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
               Text(
-                title,
+                transaction.category,
                 style: Theme.of(context).textTheme.titleSmall?.copyWith(
                   fontWeight: FontWeight.w700,
                   color: onSurface,
@@ -1656,12 +2423,19 @@ class _ActivityRow extends StatelessWidget {
               ),
               const SizedBox(height: 3),
               Text(
-                subtitle,
+                transaction.note.isEmpty ? 'No note added' : transaction.note,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: onSurface.withOpacity(0.68),
                 ),
               ),
             ],
+          ),
+        ),
+        Text(
+          '${isIncome ? '+' : '-'}\$${transaction.amount.toStringAsFixed(2)}',
+          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.w800,
+            color: accent,
           ),
         ),
       ],
@@ -1679,10 +2453,12 @@ FILE PATH: lib\screens\main_wrapper.dart
 
 import 'package:flutter/material.dart';
 
-import '../theme_controller.dart';
-import '../widgets/neon_surface.dart';
+import 'add_transaction.dart';
+import 'goals.dart';
 import 'home.dart';
 import 'profile.dart';
+import '../theme_controller.dart';
+import '../widgets/neon_surface.dart';
 
 class MainWrapperScreen extends StatefulWidget {
   const MainWrapperScreen({super.key});
@@ -1704,7 +2480,12 @@ class _MainWrapperScreenState extends State<MainWrapperScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final List<String> titles = <String>['Dashboard', 'Profile'];
+    final List<String> titles = <String>[
+      'Dashboard',
+      'Add transaction',
+      'Goals',
+      'Profile',
+    ];
 
     return Scaffold(
       extendBody: true,
@@ -1728,25 +2509,37 @@ class _MainWrapperScreenState extends State<MainWrapperScreen> {
         child: SafeArea(
           child: IndexedStack(
             index: _selectedIndex,
-            children: const <Widget>[HomeView(), ProfileView()],
+            children: const <Widget>[
+              HomeView(),
+              AddTransactionView(),
+              GoalsView(),
+              ProfileView(),
+            ],
           ),
         ),
       ),
       bottomNavigationBar: Padding(
-        // Increased the bottom padding to 16 so the pill floats nicely
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(28),
           child: MediaQuery.removePadding(
             context: context,
-            removeBottom: true, // This removes the internal empty space
+            removeBottom: true,
             child: BottomNavigationBar(
               currentIndex: _selectedIndex,
               onTap: _handleTabChanged,
               items: const <BottomNavigationBarItem>[
                 BottomNavigationBarItem(
                   icon: Icon(Icons.home_rounded),
-                  label: 'Home',
+                  label: 'Dashboard',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.add_circle_outline_rounded),
+                  label: 'Add transaction',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.flag_rounded),
+                  label: 'Goals',
                 ),
                 BottomNavigationBarItem(
                   icon: Icon(Icons.person_rounded),
@@ -1788,134 +2581,135 @@ class ProfileView extends StatelessWidget {
     final String lastSignIn = _formatDate(user?.metadata.lastSignInTime);
     final Color onSurface = Theme.of(context).colorScheme.onSurface;
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 120),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: <Widget>[
-          GlassCard(
-            child: Row(
-              children: <Widget>[
-                Container(
-                  width: 72,
-                  height: 72,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: LinearGradient(
-                      colors: <Color>[
-                        Theme.of(context).colorScheme.primary,
-                        Colors.blueAccent,
+    return Material(
+      color: Colors.transparent,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 120),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            GlassCard(
+              child: Row(
+                children: <Widget>[
+                  Container(
+                    width: 72,
+                    height: 72,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: LinearGradient(
+                        colors: <Color>[
+                          Theme.of(context).colorScheme.primary,
+                          Colors.blueAccent,
+                        ],
+                      ),
+                    ),
+                    alignment: Alignment.center,
+                    child: user?.photoURL != null
+                        ? ClipOval(
+                            child: Image.network(
+                              user!.photoURL!,
+                              width: 72,
+                              height: 72,
+                              fit: BoxFit.cover,
+                            ),
+                          )
+                        : Text(
+                            _initials(user),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 26,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Text(
+                          name,
+                          style: Theme.of(context).textTheme.headlineSmall
+                              ?.copyWith(
+                                fontWeight: FontWeight.w800,
+                                color: onSurface,
+                              ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          email,
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(color: onSurface.withOpacity(0.7)),
+                        ),
+                        Text(
+                          user?.uid ?? 'No user id available',
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(color: onSurface.withOpacity(0.58)),
+                        ),
                       ],
                     ),
                   ),
-                  alignment: Alignment.center,
-                  child: user?.photoURL != null
-                      ? ClipOval(
-                          child: Image.network(
-                            user!.photoURL!,
-                            width: 72,
-                            height: 72,
-                            fit: BoxFit.cover,
-                          ),
-                        )
-                      : Text(
-                          _initials(user),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 26,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      Text(
-                        name,
-                        style: Theme.of(context).textTheme.headlineSmall
-                            ?.copyWith(
-                              fontWeight: FontWeight.w800,
-                              color: onSurface,
-                            ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        email,
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: onSurface.withOpacity(0.7),
-                        ),
-                      ),
-                      Text(
-                        user?.uid ?? 'No user id available',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: onSurface.withOpacity(0.58),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          const SizedBox(height: 16),
-          GlassCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(
-                  'Account details',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    color: onSurface,
+            const SizedBox(height: 16),
+            GlassCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    'Account details',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      color: onSurface,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 14),
-                _SummaryRow(label: 'Authentication', value: provider),
-                const SizedBox(height: 12),
-                const SizedBox(height: 12),
-                _SummaryRow(label: 'Joined', value: joined),
-                const SizedBox(height: 12),
-                _SummaryRow(label: 'Last sign-in', value: lastSignIn),
-              ],
+                  const SizedBox(height: 14),
+                  _SummaryRow(label: 'Authentication', value: provider),
+                  const SizedBox(height: 12),
+                  const SizedBox(height: 12),
+                  _SummaryRow(label: 'Joined', value: joined),
+                  const SizedBox(height: 12),
+                  _SummaryRow(label: 'Last sign-in', value: lastSignIn),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(height: 16),
-          GlassCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(
-                  'Security',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    color: onSurface,
+            const SizedBox(height: 16),
+            GlassCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    'Security',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      color: onSurface,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 14),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: Icon(
-                    Icons.security_rounded,
-                    color: Theme.of(context).colorScheme.primary,
+                  const SizedBox(height: 14),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(
+                      Icons.security_rounded,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    title: Text('Session', style: TextStyle(color: onSurface)),
+                    subtitle: Text(
+                      'Manage the signed-in account from this device',
+                      style: TextStyle(color: onSurface.withOpacity(0.68)),
+                    ),
                   ),
-                  title: Text('Session', style: TextStyle(color: onSurface)),
-                  subtitle: Text(
-                    'Manage the signed-in account from this device',
-                    style: TextStyle(color: onSurface.withOpacity(0.68)),
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          const SizedBox(height: 18),
-          ElevatedButton.icon(
-            onPressed: () => _confirmSignOut(context),
-            icon: const Icon(Icons.logout_rounded),
-            label: const Text('Sign out'),
-          ),
-        ],
+            const SizedBox(height: 18),
+            ElevatedButton.icon(
+              onPressed: () => _confirmSignOut(context),
+              icon: const Icon(Icons.logout_rounded),
+              label: const Text('Sign out'),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -2078,6 +2872,204 @@ String _formatDate(DateTime? value) {
   ];
 
   return '${months[value.month - 1]} ${value.day}, ${value.year}';
+}
+
+
+
+
+========================================
+FILE PATH: lib\services\budget_firestore_service.dart
+========================================
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
+import '../models/goal.dart';
+import '../models/transaction.dart';
+
+class BudgetFirestoreService {
+  const BudgetFirestoreService._();
+
+  static const BudgetFirestoreService instance = BudgetFirestoreService._();
+
+  CollectionReference<Map<String, dynamic>> _users() {
+    return FirebaseFirestore.instance.collection('users');
+  }
+
+  DocumentReference<Map<String, dynamic>> _userDoc(String uid) {
+    return _users().doc(uid);
+  }
+
+  CollectionReference<Map<String, dynamic>> _transactions(User user) {
+    return _userDoc(user.uid).collection('transactions');
+  }
+
+  CollectionReference<Map<String, dynamic>> _goals(User user) {
+    return _userDoc(user.uid).collection('goals');
+  }
+
+  CollectionReference<Map<String, dynamic>> _monthlySummaries(User user) {
+    return _userDoc(user.uid).collection('monthlySummaries');
+  }
+
+  Future<void> ensureBudgetNodes({required User user}) async {
+    final DateTime now = DateTime.now();
+    final String monthKey = _monthKey(now);
+    final Timestamp joinedAt = Timestamp.fromDate(
+      user.metadata.creationTime ?? now,
+    );
+
+    await _userDoc(user.uid).set(<String, dynamic>{
+      'email': user.email ?? '',
+      'displayName': _displayName(user),
+      'photoURL': user.photoURL ?? '',
+      'createdAt': joinedAt,
+      'lastSignInAt': FieldValue.serverTimestamp(),
+      'activeMonthKey': monthKey,
+    }, SetOptions(merge: true));
+
+    await _monthlySummaries(user).doc(monthKey).set(<String, dynamic>{
+      'monthKey': monthKey,
+      'monthLabel': _monthLabel(now),
+      'incomeTotal': 0.0,
+      'expenseTotal': 0.0,
+      'netTotal': 0.0,
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
+  Stream<DocumentSnapshot<Map<String, dynamic>>> watchMonthlySummary(
+    User user,
+  ) {
+    final String monthKey = _monthKey(DateTime.now());
+    return _monthlySummaries(user).doc(monthKey).snapshots();
+  }
+
+  Stream<List<TransactionModel>> watchCurrentMonthTransactions(User user) {
+    final DateTime now = DateTime.now();
+    final DateTime startOfMonth = DateTime(now.year, now.month);
+    final DateTime startOfNextMonth = DateTime(now.year, now.month + 1);
+
+    return _transactions(user)
+        .where(
+          'timestamp',
+          isGreaterThanOrEqualTo: Timestamp.fromDate(startOfMonth),
+        )
+        .where('timestamp', isLessThan: Timestamp.fromDate(startOfNextMonth))
+        .orderBy('timestamp', descending: true)
+        .snapshots()
+        .map(
+          (QuerySnapshot<Map<String, dynamic>> snapshot) =>
+              snapshot.docs.map(TransactionModel.fromFirestore).toList(),
+        );
+  }
+
+  Stream<List<GoalModel>> watchGoals(User user) {
+    return _goals(user)
+        .orderBy('deadline')
+        .snapshots()
+        .map(
+          (QuerySnapshot<Map<String, dynamic>> snapshot) =>
+              snapshot.docs.map(GoalModel.fromFirestore).toList(),
+        );
+  }
+
+  Future<void> addTransaction({
+    required User user,
+    required double amount,
+    required String type,
+    required String category,
+    required String note,
+  }) async {
+    final DateTime now = DateTime.now();
+    final String monthKey = _monthKey(now);
+    final DocumentReference<Map<String, dynamic>> transactionRef =
+        _transactions(user).doc();
+    final DocumentReference<Map<String, dynamic>> summaryRef =
+        _monthlySummaries(user).doc(monthKey);
+
+    final bool isIncome = type == 'income';
+    final double incomeDelta = isIncome ? amount : 0.0;
+    final double expenseDelta = isIncome ? 0.0 : amount;
+
+    await FirebaseFirestore.instance.runTransaction<void>((
+      Transaction transaction,
+    ) async {
+      transaction.set(transactionRef, <String, dynamic>{
+        'amount': amount,
+        'type': type,
+        'category': category,
+        'aiCategory': category,
+        'note': note,
+        'timestamp': Timestamp.fromDate(now),
+        'monthKey': monthKey,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+
+      transaction.set(summaryRef, <String, dynamic>{
+        'monthKey': monthKey,
+        'monthLabel': _monthLabel(now),
+        'incomeTotal': FieldValue.increment(incomeDelta),
+        'expenseTotal': FieldValue.increment(expenseDelta),
+        'netTotal': FieldValue.increment(incomeDelta - expenseDelta),
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    });
+  }
+
+  Future<void> addGoal({
+    required User user,
+    required String title,
+    required double targetAmount,
+    required DateTime deadline,
+  }) async {
+    await _goals(user).add(<String, dynamic>{
+      'title': title,
+      'targetAmount': targetAmount,
+      'currentAmount': 0.0,
+      'deadline': Timestamp.fromDate(deadline),
+      'status': 'active',
+      'createdAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  String _displayName(User user) {
+    final String? displayName = user.displayName?.trim();
+    if (displayName != null && displayName.isNotEmpty) {
+      return displayName;
+    }
+
+    final String? email = user.email?.trim();
+    if (email != null && email.isNotEmpty) {
+      return email.split('@').first;
+    }
+
+    return 'User';
+  }
+
+  String _monthKey(DateTime value) {
+    final String month = value.month.toString().padLeft(2, '0');
+    return '${value.year}-$month';
+  }
+
+  String _monthLabel(DateTime value) {
+    const List<String> months = <String>[
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+
+    return '${months[value.month - 1]} ${value.year}';
+  }
 }
 
 
