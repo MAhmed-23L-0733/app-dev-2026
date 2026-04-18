@@ -4,6 +4,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
+import '../auth/user_profile_service.dart';
+import '../services/currency_service.dart';
 import '../models/transaction.dart';
 import '../services/budget_firestore_service.dart';
 import '../widgets/neon_surface.dart';
@@ -27,251 +29,365 @@ class HomeView extends StatelessWidget {
       );
     }
 
-    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-      stream: BudgetFirestoreService.instance.watchMonthlySummary(user),
-      builder:
-          (
-            BuildContext context,
-            AsyncSnapshot<DocumentSnapshot<Map<String, dynamic>>>
-            summarySnapshot,
-          ) {
-            final _BudgetSummary summary = _BudgetSummary.fromMap(
-              summarySnapshot.data?.data(),
-            );
+    return ValueListenableBuilder<String>(
+      valueListenable: CurrencyPreferenceController.instance.currencyCode,
+      builder: (BuildContext context, String currencyCode, _) {
+        return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+          stream: BudgetFirestoreService.instance.watchMonthlySummary(user),
+          builder:
+              (
+                BuildContext context,
+                AsyncSnapshot<DocumentSnapshot<Map<String, dynamic>>>
+                summarySnapshot,
+              ) {
+                final _BudgetSummary summary = _BudgetSummary.fromMap(
+                  summarySnapshot.data?.data(),
+                );
 
-            return StreamBuilder<List<TransactionModel>>(
-              stream: BudgetFirestoreService.instance
-                  .watchCurrentMonthTransactions(user),
-              builder:
-                  (
-                    BuildContext context,
-                    AsyncSnapshot<List<TransactionModel>> transactionsSnapshot,
-                  ) {
-                    final List<TransactionModel> transactions =
-                        transactionsSnapshot.data ?? <TransactionModel>[];
-                    final double balance =
-                        summary.incomeTotal - summary.expenseTotal;
+                return StreamBuilder<List<TransactionModel>>(
+                  stream: BudgetFirestoreService.instance
+                      .watchCurrentMonthTransactions(user),
+                  builder:
+                      (
+                        BuildContext context,
+                        AsyncSnapshot<List<TransactionModel>>
+                        transactionsSnapshot,
+                      ) {
+                        final List<TransactionModel> transactions =
+                            transactionsSnapshot.data ?? <TransactionModel>[];
+                        final double derivedIncomeTotal = transactions
+                            .where(
+                              (TransactionModel transaction) =>
+                                  transaction.type == 'income',
+                            )
+                            .fold<double>(
+                              0,
+                              (double total, TransactionModel transaction) =>
+                                  total + transaction.amount,
+                            );
+                        final double derivedExpenseTotal = transactions
+                            .where(
+                              (TransactionModel transaction) =>
+                                  transaction.type != 'income',
+                            )
+                            .fold<double>(
+                              0,
+                              (double total, TransactionModel transaction) =>
+                                  total + transaction.amount,
+                            );
+                        final bool shouldUseDerivedTotals =
+                            transactions.isNotEmpty &&
+                            summary.incomeTotal == 0 &&
+                            summary.expenseTotal == 0;
+                        final double incomeTotal = shouldUseDerivedTotals
+                            ? derivedIncomeTotal
+                            : summary.incomeTotal;
+                        final double expenseTotal = shouldUseDerivedTotals
+                            ? derivedExpenseTotal
+                            : summary.expenseTotal;
+                        final double balanceBase = incomeTotal - expenseTotal;
 
-                    return SingleChildScrollView(
-                      padding: const EdgeInsets.fromLTRB(20, 12, 20, 120),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: <Widget>[
-                          GlassCard(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: <Widget>[
-                                Row(
+                        return SingleChildScrollView(
+                          padding: const EdgeInsets.fromLTRB(20, 12, 20, 120),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: <Widget>[
+                              GlassCard(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: <Widget>[
-                                    Container(
-                                      width: 58,
-                                      height: 58,
-                                      decoration: BoxDecoration(
-                                        shape: BoxShape.circle,
-                                        gradient: LinearGradient(
-                                          colors: <Color>[
-                                            Theme.of(
-                                              context,
-                                            ).colorScheme.primary,
-                                            Colors.blueAccent,
-                                          ],
-                                        ),
-                                      ),
-                                      alignment: Alignment.center,
-                                      child: Text(
-                                        _initials(user),
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 20,
-                                          fontWeight: FontWeight.w800,
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 14),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: <Widget>[
-                                          Text(
-                                            'Monthly budget dashboard',
-                                            style: Theme.of(context)
-                                                .textTheme
-                                                .headlineMedium
-                                                ?.copyWith(
-                                                  fontWeight: FontWeight.w800,
-                                                  color: onSurface,
-                                                ),
+                                    Row(
+                                      children: <Widget>[
+                                        Container(
+                                          width: 58,
+                                          height: 58,
+                                          decoration: BoxDecoration(
+                                            shape: BoxShape.circle,
+                                            gradient: LinearGradient(
+                                              colors: <Color>[
+                                                Theme.of(
+                                                  context,
+                                                ).colorScheme.primary,
+                                                Colors.blueAccent,
+                                              ],
+                                            ),
                                           ),
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            _displayName(user),
-                                            style: Theme.of(context)
-                                                .textTheme
-                                                .bodyMedium
-                                                ?.copyWith(
-                                                  color: onSurface.withOpacity(
-                                                    0.74,
+                                          alignment: Alignment.center,
+                                          child: Text(
+                                            _initials(user),
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 20,
+                                              fontWeight: FontWeight.w800,
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 14),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: <Widget>[
+                                              Text(
+                                                'Monthly budget dashboard',
+                                                style: Theme.of(context)
+                                                    .textTheme
+                                                    .headlineMedium
+                                                    ?.copyWith(
+                                                      fontWeight:
+                                                          FontWeight.w800,
+                                                      color: onSurface,
+                                                    ),
+                                              ),
+                                              const SizedBox(height: 4),
+                                              Text(
+                                                _displayName(user),
+                                                style: Theme.of(context)
+                                                    .textTheme
+                                                    .bodyMedium
+                                                    ?.copyWith(
+                                                      color: onSurface
+                                                          .withOpacity(0.74),
+                                                    ),
+                                              ),
+                                              const SizedBox(height: 12),
+                                              Align(
+                                                alignment: Alignment.centerLeft,
+                                                child: SizedBox(
+                                                  width: 220,
+                                                  child: DropdownButtonFormField<String>(
+                                                    value: currencyCode,
+                                                    decoration:
+                                                        const InputDecoration(
+                                                          labelText:
+                                                              'Currency converter',
+                                                          prefixIcon: Icon(
+                                                            Icons
+                                                                .payments_rounded,
+                                                          ),
+                                                        ),
+                                                    items: CurrencyPreferenceController
+                                                        .options
+                                                        .map(
+                                                          (
+                                                            CurrencyOption
+                                                            option,
+                                                          ) =>
+                                                              DropdownMenuItem<
+                                                                String
+                                                              >(
+                                                                value:
+                                                                    option.code,
+                                                                child: Text(
+                                                                  option.label,
+                                                                ),
+                                                              ),
+                                                        )
+                                                        .toList(),
+                                                    onChanged: (String? value) {
+                                                      if (value == null) {
+                                                        return;
+                                                      }
+
+                                                      UserProfileService
+                                                          .instance
+                                                          .updatePreferredCurrency(
+                                                            user,
+                                                            value,
+                                                          );
+                                                    },
                                                   ),
                                                 ),
+                                              ),
+                                            ],
                                           ),
-                                        ],
-                                      ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 18),
+                                    Text(
+                                      'Total monthly spendings',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .labelLarge
+                                          ?.copyWith(
+                                            color: onSurface.withOpacity(0.7),
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      CurrencyPreferenceController.instance
+                                          .formatBaseAmount(
+                                            expenseTotal,
+                                            currencyCode,
+                                          ),
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .displaySmall
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.w900,
+                                            color: onSurface,
+                                          ),
+                                    ),
+                                    const SizedBox(height: 10),
+                                    Text(
+                                      'Updated for ${summary.monthLabel}',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodyMedium
+                                          ?.copyWith(
+                                            color: onSurface.withOpacity(0.72),
+                                          ),
                                     ),
                                   ],
                                 ),
-                                const SizedBox(height: 18),
-                                Text(
-                                  'Total monthly spendings',
-                                  style: Theme.of(context).textTheme.labelLarge
-                                      ?.copyWith(
-                                        color: onSurface.withOpacity(0.7),
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  _formatMoney(summary.expenseTotal),
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .displaySmall
-                                      ?.copyWith(
-                                        fontWeight: FontWeight.w900,
-                                        color: onSurface,
-                                      ),
-                                ),
-                                const SizedBox(height: 10),
-                                Text(
-                                  'Updated for ${summary.monthLabel}',
-                                  style: Theme.of(context).textTheme.bodyMedium
-                                      ?.copyWith(
-                                        color: onSurface.withOpacity(0.72),
-                                      ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          Row(
-                            children: <Widget>[
-                              Expanded(
-                                child: _MetricTile(
-                                  label: 'Income',
-                                  value: _formatMoney(summary.incomeTotal),
-                                  icon: Icons.trending_up_rounded,
-                                ),
                               ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: _MetricTile(
-                                  label: 'Spendings',
-                                  value: _formatMoney(summary.expenseTotal),
-                                  icon: Icons.trending_down_rounded,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 16),
-                          GlassCard(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: <Widget>[
-                                Text(
-                                  'Net balance',
-                                  style: Theme.of(context).textTheme.titleLarge
-                                      ?.copyWith(
-                                        fontWeight: FontWeight.w800,
-                                        color: onSurface,
-                                      ),
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  _formatMoney(balance),
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .headlineMedium
-                                      ?.copyWith(
-                                        fontWeight: FontWeight.w900,
-                                        color: balance >= 0
-                                            ? Theme.of(
-                                                context,
-                                              ).colorScheme.primary
-                                            : Theme.of(
-                                                context,
-                                              ).colorScheme.error,
-                                      ),
-                                ),
-                                const SizedBox(height: 10),
-                                Text(
-                                  'Income minus spendings for the current month.',
-                                  style: Theme.of(context).textTheme.bodyMedium
-                                      ?.copyWith(
-                                        color: onSurface.withOpacity(0.72),
-                                      ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          GlassCard(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: <Widget>[
-                                Text(
-                                  'Recent transactions',
-                                  style: Theme.of(context).textTheme.titleLarge
-                                      ?.copyWith(
-                                        fontWeight: FontWeight.w800,
-                                        color: onSurface,
-                                      ),
-                                ),
-                                const SizedBox(height: 14),
-                                if (transactionsSnapshot.connectionState ==
-                                    ConnectionState.waiting)
-                                  const Center(
-                                    child: Padding(
-                                      padding: EdgeInsets.symmetric(
-                                        vertical: 24,
-                                      ),
-                                      child: CircularProgressIndicator(),
+                              const SizedBox(height: 16),
+                              Row(
+                                children: <Widget>[
+                                  Expanded(
+                                    child: _MetricTile(
+                                      label: 'Income',
+                                      value: CurrencyPreferenceController
+                                          .instance
+                                          .formatBaseAmount(
+                                            incomeTotal,
+                                            currencyCode,
+                                          ),
+                                      icon: Icons.trending_up_rounded,
                                     ),
-                                  )
-                                else if (transactions.isEmpty)
-                                  Text(
-                                    'No transactions added this month yet.',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .bodyMedium
-                                        ?.copyWith(
-                                          color: onSurface.withOpacity(0.7),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: _MetricTile(
+                                      label: 'Spendings',
+                                      value: CurrencyPreferenceController
+                                          .instance
+                                          .formatBaseAmount(
+                                            expenseTotal,
+                                            currencyCode,
+                                          ),
+                                      icon: Icons.trending_down_rounded,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 16),
+                              GlassCard(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: <Widget>[
+                                    Text(
+                                      'Net balance',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .titleLarge
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.w800,
+                                            color: onSurface,
+                                          ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      CurrencyPreferenceController.instance
+                                          .formatBaseAmount(
+                                            balanceBase,
+                                            currencyCode,
+                                          ),
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .headlineMedium
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.w900,
+                                            color: balanceBase >= 0
+                                                ? Theme.of(
+                                                    context,
+                                                  ).colorScheme.primary
+                                                : Theme.of(
+                                                    context,
+                                                  ).colorScheme.error,
+                                          ),
+                                    ),
+                                    const SizedBox(height: 10),
+                                    Text(
+                                      'Income minus spendings for the current month.',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodyMedium
+                                          ?.copyWith(
+                                            color: onSurface.withOpacity(0.72),
+                                          ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              GlassCard(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: <Widget>[
+                                    Text(
+                                      'Recent transactions',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .titleLarge
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.w800,
+                                            color: onSurface,
+                                          ),
+                                    ),
+                                    const SizedBox(height: 14),
+                                    if (transactionsSnapshot.connectionState ==
+                                        ConnectionState.waiting)
+                                      const Center(
+                                        child: Padding(
+                                          padding: EdgeInsets.symmetric(
+                                            vertical: 24,
+                                          ),
+                                          child: CircularProgressIndicator(),
                                         ),
-                                  )
-                                else
-                                  Column(
-                                    children: transactions
-                                        .take(6)
-                                        .map(
-                                          (TransactionModel transaction) =>
-                                              Padding(
+                                      )
+                                    else if (transactions.isEmpty)
+                                      Text(
+                                        'No transactions added this month yet.',
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodyMedium
+                                            ?.copyWith(
+                                              color: onSurface.withOpacity(0.7),
+                                            ),
+                                      )
+                                    else
+                                      Column(
+                                        children: transactions
+                                            .take(6)
+                                            .map(
+                                              (
+                                                TransactionModel transaction,
+                                              ) => Padding(
                                                 padding: const EdgeInsets.only(
                                                   bottom: 12,
                                                 ),
                                                 child: _TransactionRow(
                                                   transaction: transaction,
+                                                  currencyCode: currencyCode,
                                                 ),
                                               ),
-                                        )
-                                        .toList(),
-                                  ),
-                              ],
-                            ),
+                                            )
+                                            .toList(),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
-                    );
-                  },
-            );
-          },
+                        );
+                      },
+                );
+              },
+        );
+      },
     );
   }
 }
@@ -362,11 +478,6 @@ String _monthLabel(DateTime value) {
   return '${months[value.month - 1]} ${value.year}';
 }
 
-String _formatMoney(double amount) {
-  final String prefix = amount < 0 ? '-' : '';
-  return '$prefix\$${amount.abs().toStringAsFixed(2)}';
-}
-
 class _MetricTile extends StatelessWidget {
   const _MetricTile({
     required this.label,
@@ -409,9 +520,13 @@ class _MetricTile extends StatelessWidget {
 }
 
 class _TransactionRow extends StatelessWidget {
-  const _TransactionRow({required this.transaction});
+  const _TransactionRow({
+    required this.transaction,
+    required this.currencyCode,
+  });
 
   final TransactionModel transaction;
+  final String currencyCode;
 
   @override
   Widget build(BuildContext context) {
@@ -458,7 +573,10 @@ class _TransactionRow extends StatelessWidget {
           ),
         ),
         Text(
-          '${isIncome ? '+' : '-'}\$${transaction.amount.toStringAsFixed(2)}',
+          CurrencyPreferenceController.instance.formatBaseAmount(
+            isIncome ? transaction.amount : -transaction.amount,
+            currencyCode,
+          ),
           style: Theme.of(context).textTheme.titleSmall?.copyWith(
             fontWeight: FontWeight.w800,
             color: accent,

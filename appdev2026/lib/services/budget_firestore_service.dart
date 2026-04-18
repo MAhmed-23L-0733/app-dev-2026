@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 import '../models/goal.dart';
 import '../models/transaction.dart';
+import 'currency_service.dart';
 
 class BudgetFirestoreService {
   const BudgetFirestoreService._();
@@ -94,26 +95,29 @@ class BudgetFirestoreService {
   Future<void> addTransaction({
     required User user,
     required double amount,
+    required String currencyCode,
     required String type,
     required String category,
     required String note,
   }) async {
     final DateTime now = DateTime.now();
     final String monthKey = _monthKey(now);
+    final double amountInBase = CurrencyPreferenceController.instance
+        .toBaseAmount(amount, currencyCode);
     final DocumentReference<Map<String, dynamic>> transactionRef =
         _transactions(user).doc();
     final DocumentReference<Map<String, dynamic>> summaryRef =
         _monthlySummaries(user).doc(monthKey);
 
     final bool isIncome = type == 'income';
-    final double incomeDelta = isIncome ? amount : 0.0;
-    final double expenseDelta = isIncome ? 0.0 : amount;
+    final double incomeDelta = isIncome ? amountInBase : 0.0;
+    final double expenseDelta = isIncome ? 0.0 : amountInBase;
 
     await FirebaseFirestore.instance.runTransaction<void>((
       Transaction transaction,
     ) async {
       transaction.set(transactionRef, <String, dynamic>{
-        'amount': amount,
+        'amount': amountInBase,
         'type': type,
         'category': category,
         'aiCategory': category,
@@ -138,16 +142,102 @@ class BudgetFirestoreService {
     required User user,
     required String title,
     required double targetAmount,
+    required String currencyCode,
     required DateTime deadline,
   }) async {
+    final double targetInBase = CurrencyPreferenceController.instance
+        .toBaseAmount(targetAmount, currencyCode);
+
     await _goals(user).add(<String, dynamic>{
       'title': title,
-      'targetAmount': targetAmount,
+      'targetAmount': targetInBase,
       'currentAmount': 0.0,
       'deadline': Timestamp.fromDate(deadline),
       'status': 'active',
       'createdAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  Future<double> getCurrentMonthNetTotal(User user) async {
+    final DocumentSnapshot<Map<String, dynamic>> snapshot =
+        await _monthlySummaries(user).doc(_monthKey(DateTime.now())).get();
+
+    final Map<String, dynamic>? data = snapshot.data();
+    return (data?['netTotal'] as num? ?? 0).toDouble();
+  }
+
+  Future<void> addSavingsToGoal({
+    required User user,
+    required String goalId,
+    required double amount,
+    required String currencyCode,
+  }) async {
+    final double amountInBase = CurrencyPreferenceController.instance
+        .toBaseAmount(amount, currencyCode);
+    final DocumentReference<Map<String, dynamic>> goalRef = _goals(
+      user,
+    ).doc(goalId);
+    final DocumentReference<Map<String, dynamic>> summaryRef =
+        _monthlySummaries(user).doc(_monthKey(DateTime.now()));
+
+    await FirebaseFirestore.instance.runTransaction<void>((
+      Transaction transaction,
+    ) async {
+      final DocumentSnapshot<Map<String, dynamic>> goalSnapshot =
+          await transaction.get(goalRef);
+      final DocumentSnapshot<Map<String, dynamic>> summarySnapshot =
+          await transaction.get(summaryRef);
+
+      final Map<String, dynamic> goalData =
+          goalSnapshot.data() ?? <String, dynamic>{};
+      final Map<String, dynamic> summaryData =
+          summarySnapshot.data() ?? <String, dynamic>{};
+
+      final double currentAmount = (goalData['currentAmount'] as num? ?? 0)
+          .toDouble();
+      final double targetAmount = (goalData['targetAmount'] as num? ?? 0)
+          .toDouble();
+      final double netTotal = (summaryData['netTotal'] as num? ?? 0).toDouble();
+
+      if (amountInBase <= 0) {
+        throw FirebaseException(
+          plugin: 'cloud_firestore',
+          code: 'invalid-amount',
+          message: 'Enter a valid savings amount.',
+        );
+      }
+
+      if (amountInBase > netTotal) {
+        throw FirebaseException(
+          plugin: 'cloud_firestore',
+          code: 'insufficient-net-balance',
+          message: 'Savings amount is greater than the current net value.',
+        );
+      }
+
+      final double remaining = targetAmount - currentAmount;
+      if (remaining <= 0) {
+        throw FirebaseException(
+          plugin: 'cloud_firestore',
+          code: 'goal-complete',
+          message: 'This goal has already reached its target.',
+        );
+      }
+
+      if (amountInBase > remaining) {
+        throw FirebaseException(
+          plugin: 'cloud_firestore',
+          code: 'exceeds-target',
+          message: 'Savings amount is greater than the remaining target.',
+        );
+      }
+
+      transaction.update(goalRef, <String, dynamic>{
+        'currentAmount': FieldValue.increment(amountInBase),
+        'updatedAt': FieldValue.serverTimestamp(),
+        if (currentAmount + amountInBase >= targetAmount) 'status': 'completed',
+      });
     });
   }
 

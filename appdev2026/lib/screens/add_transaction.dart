@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
+import '../services/currency_service.dart';
 import '../services/budget_firestore_service.dart';
 import '../widgets/neon_surface.dart';
 
@@ -46,6 +47,7 @@ class _AddTransactionViewState extends State<AddTransactionView> {
       await BudgetFirestoreService.instance.addTransaction(
         user: user,
         amount: double.parse(_amountController.text.trim()),
+        currencyCode: CurrencyPreferenceController.instance.currentCode,
         type: _selectedType,
         category: _categoryController.text.trim(),
         note: _noteController.text.trim(),
@@ -81,139 +83,162 @@ class _AddTransactionViewState extends State<AddTransactionView> {
   Widget build(BuildContext context) {
     final Color onSurface = Theme.of(context).colorScheme.onSurface;
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 120),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: <Widget>[
-          GlassCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(
-                  'Add transaction',
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    color: onSurface,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Track every income and expense so your monthly totals stay live.',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: onSurface.withOpacity(0.7),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                Form(
-                  key: _formKey,
-                  child: Column(
-                    children: <Widget>[
-                      Wrap(
-                        spacing: 12,
+    return ValueListenableBuilder<String>(
+      valueListenable: CurrencyPreferenceController.instance.currencyCode,
+      builder: (BuildContext context, String currencyCode, _) {
+        final CurrencyOption currency = CurrencyPreferenceController.instance
+            .optionFor(currencyCode);
+
+        return SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 120),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              GlassCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      'Add transaction',
+                      style: Theme.of(context).textTheme.headlineSmall
+                          ?.copyWith(
+                            fontWeight: FontWeight.w800,
+                            color: onSurface,
+                          ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Track every income and expense so your monthly totals stay live.',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: onSurface.withOpacity(0.7),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Form(
+                      key: _formKey,
+                      child: Column(
                         children: <Widget>[
-                          ChoiceChip(
-                            label: const Text('Expense'),
-                            selected: _selectedType == 'expense',
-                            onSelected: (_) {
-                              setState(() {
-                                _selectedType = 'expense';
-                              });
+                          Wrap(
+                            spacing: 12,
+                            children: <Widget>[
+                              ChoiceChip(
+                                label: const Text('Expense'),
+                                selected: _selectedType == 'expense',
+                                onSelected: (_) {
+                                  setState(() {
+                                    _selectedType = 'expense';
+                                  });
+                                },
+                              ),
+                              ChoiceChip(
+                                label: const Text('Income'),
+                                selected: _selectedType == 'income',
+                                onSelected: (_) {
+                                  setState(() {
+                                    _selectedType = 'income';
+                                  });
+                                },
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          TextFormField(
+                            controller: _amountController,
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
+                            decoration: InputDecoration(
+                              labelText: 'Amount',
+                              prefixText: '${currency.symbol} ',
+                              prefixIcon: const Icon(
+                                Icons.attach_money_rounded,
+                              ),
+                            ),
+                            validator: (String? value) {
+                              final String text = value?.trim() ?? '';
+                              final double? amount = double.tryParse(text);
+                              if (amount == null || amount <= 0) {
+                                return 'Enter a valid amount.';
+                              }
+                              return null;
                             },
                           ),
-                          ChoiceChip(
-                            label: const Text('Income'),
-                            selected: _selectedType == 'income',
-                            onSelected: (_) {
-                              setState(() {
-                                _selectedType = 'income';
-                              });
+                          const SizedBox(height: 8),
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              'Amounts are entered in ${currency.code} and converted automatically.',
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
+                                    color: onSurface.withOpacity(0.62),
+                                  ),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          TextFormField(
+                            controller: _categoryController,
+                            textCapitalization: TextCapitalization.words,
+                            decoration: const InputDecoration(
+                              labelText: 'Category',
+                              prefixIcon: Icon(Icons.sell_rounded),
+                            ),
+                            validator: (String? value) {
+                              if ((value ?? '').trim().isEmpty) {
+                                return 'Enter a category.';
+                              }
+                              return null;
                             },
+                          ),
+                          const SizedBox(height: 16),
+                          TextFormField(
+                            controller: _noteController,
+                            textCapitalization: TextCapitalization.sentences,
+                            maxLines: 3,
+                            decoration: const InputDecoration(
+                              labelText: 'Note',
+                              prefixIcon: Icon(Icons.notes_rounded),
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                          ElevatedButton.icon(
+                            onPressed: _isSaving ? null : _saveTransaction,
+                            icon: const Icon(Icons.save_rounded),
+                            label: Text(
+                              _isSaving ? 'Saving...' : 'Save transaction',
+                            ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _amountController,
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
-                        ),
-                        decoration: const InputDecoration(
-                          labelText: 'Amount',
-                          prefixIcon: Icon(Icons.attach_money_rounded),
-                        ),
-                        validator: (String? value) {
-                          final String text = value?.trim() ?? '';
-                          final double? amount = double.tryParse(text);
-                          if (amount == null || amount <= 0) {
-                            return 'Enter a valid amount.';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _categoryController,
-                        textCapitalization: TextCapitalization.words,
-                        decoration: const InputDecoration(
-                          labelText: 'Category',
-                          prefixIcon: Icon(Icons.sell_rounded),
-                        ),
-                        validator: (String? value) {
-                          if ((value ?? '').trim().isEmpty) {
-                            return 'Enter a category.';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _noteController,
-                        textCapitalization: TextCapitalization.sentences,
-                        maxLines: 3,
-                        decoration: const InputDecoration(
-                          labelText: 'Note',
-                          prefixIcon: Icon(Icons.notes_rounded),
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      ElevatedButton.icon(
-                        onPressed: _isSaving ? null : _saveTransaction,
-                        icon: const Icon(Icons.save_rounded),
-                        label: Text(
-                          _isSaving ? 'Saving...' : 'Save transaction',
-                        ),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(height: 16),
+              GlassCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      'Tips',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        color: onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Income raises your available balance. Expenses update the monthly spendings card on the dashboard immediately after sync.',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: onSurface.withOpacity(0.7),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 16),
-          GlassCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(
-                  'Tips',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    color: onSurface,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'Income raises your available balance. Expenses update the monthly spendings card on the dashboard immediately after sync.',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: onSurface.withOpacity(0.7),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 }

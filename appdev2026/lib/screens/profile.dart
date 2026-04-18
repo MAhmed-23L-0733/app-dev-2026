@@ -105,6 +105,10 @@ class ProfileView extends StatelessWidget {
                   const SizedBox(height: 14),
                   _SummaryRow(label: 'Authentication', value: provider),
                   const SizedBox(height: 12),
+                  _SummaryRow(
+                    label: 'Currency',
+                    value: 'Managed from Dashboard',
+                  ),
                   const SizedBox(height: 12),
                   _SummaryRow(label: 'Joined', value: joined),
                   const SizedBox(height: 12),

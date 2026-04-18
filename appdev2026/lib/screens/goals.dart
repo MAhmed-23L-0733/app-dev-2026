@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../models/goal.dart';
 import '../services/budget_firestore_service.dart';
+import '../services/currency_service.dart';
 import '../widgets/neon_surface.dart';
 
 class GoalsView extends StatefulWidget {
@@ -30,12 +31,20 @@ class _GoalsViewState extends State<GoalsView> {
 
   Future<void> _pickDeadline() async {
     final DateTime now = DateTime.now();
-    final DateTime initialDate = _deadline ?? now.add(const Duration(days: 30));
+    final DateTime minimumDate = DateTime(
+      now.year,
+      now.month,
+      now.day,
+    ).add(const Duration(days: 1));
+    final DateTime initialDate =
+        _deadline ?? minimumDate.add(const Duration(days: 30));
 
     final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: initialDate,
-      firstDate: now,
+      initialDate: initialDate.isBefore(minimumDate)
+          ? minimumDate
+          : initialDate,
+      firstDate: minimumDate,
       lastDate: DateTime(now.year + 10),
     );
 
@@ -49,7 +58,7 @@ class _GoalsViewState extends State<GoalsView> {
     });
   }
 
-  Future<void> _saveGoal() async {
+  Future<void> _saveGoal(String currencyCode) async {
     if (!(_formKey.currentState?.validate() ?? false)) {
       return;
     }
@@ -66,6 +75,11 @@ class _GoalsViewState extends State<GoalsView> {
       return;
     }
 
+    if (!deadline.isAfter(DateTime.now())) {
+      _showMessage('Deadline must be a future date.');
+      return;
+    }
+
     setState(() {
       _isSaving = true;
     });
@@ -75,6 +89,7 @@ class _GoalsViewState extends State<GoalsView> {
         user: user,
         title: _titleController.text.trim(),
         targetAmount: double.parse(_targetController.text.trim()),
+        currencyCode: currencyCode,
         deadline: deadline,
       );
 
@@ -121,145 +136,185 @@ class _GoalsViewState extends State<GoalsView> {
       );
     }
 
-    return StreamBuilder<List<GoalModel>>(
-      stream: BudgetFirestoreService.instance.watchGoals(user),
-      builder: (BuildContext context, AsyncSnapshot<List<GoalModel>> snapshot) {
-        final List<GoalModel> goals = snapshot.data ?? <GoalModel>[];
+    return ValueListenableBuilder<String>(
+      valueListenable: CurrencyPreferenceController.instance.currencyCode,
+      builder: (BuildContext context, String currencyCode, _) {
+        return StreamBuilder<double>(
+          stream: BudgetFirestoreService.instance
+              .watchMonthlySummary(user)
+              .map(
+                (snapshot) =>
+                    (snapshot.data()?['netTotal'] as num? ?? 0).toDouble(),
+              ),
+          builder: (BuildContext context, AsyncSnapshot<double> netSnapshot) {
+            final double availableNetBase = netSnapshot.data ?? 0.0;
+            final double availableNetDisplay = CurrencyPreferenceController
+                .instance
+                .fromBaseAmount(availableNetBase, currencyCode);
 
-        return SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 120),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: <Widget>[
-              GlassCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Text(
-                      'Goals',
-                      style: Theme.of(context).textTheme.headlineSmall
-                          ?.copyWith(
-                            fontWeight: FontWeight.w800,
-                            color: onSurface,
-                          ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Set clear targets and track them alongside your monthly budget.',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: onSurface.withOpacity(0.7),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    Form(
-                      key: _formKey,
-                      child: Column(
-                        children: <Widget>[
-                          TextFormField(
-                            controller: _titleController,
-                            textCapitalization: TextCapitalization.words,
-                            decoration: const InputDecoration(
-                              labelText: 'Goal title',
-                              prefixIcon: Icon(Icons.flag_rounded),
+            return StreamBuilder<List<GoalModel>>(
+              stream: BudgetFirestoreService.instance.watchGoals(user),
+              builder: (BuildContext context, AsyncSnapshot<List<GoalModel>> snapshot) {
+                final List<GoalModel> goals = snapshot.data ?? <GoalModel>[];
+
+                return SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 120),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: <Widget>[
+                      GlassCard(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: <Widget>[
+                            Text(
+                              'Goals',
+                              style: Theme.of(context).textTheme.headlineSmall
+                                  ?.copyWith(
+                                    fontWeight: FontWeight.w800,
+                                    color: onSurface,
+                                  ),
                             ),
-                            validator: (String? value) {
-                              if ((value ?? '').trim().isEmpty) {
-                                return 'Enter a goal title.';
-                              }
-                              return null;
-                            },
-                          ),
-                          const SizedBox(height: 16),
-                          TextFormField(
-                            controller: _targetController,
-                            keyboardType: const TextInputType.numberWithOptions(
-                              decimal: true,
+                            const SizedBox(height: 8),
+                            Text(
+                              'Set clear targets and track them alongside your monthly budget.',
+                              style: Theme.of(context).textTheme.bodyMedium
+                                  ?.copyWith(color: onSurface.withOpacity(0.7)),
                             ),
-                            decoration: const InputDecoration(
-                              labelText: 'Target amount',
-                              prefixIcon: Icon(Icons.savings_rounded),
-                            ),
-                            validator: (String? value) {
-                              final double? amount = double.tryParse(
-                                value?.trim() ?? '',
-                              );
-                              if (amount == null || amount <= 0) {
-                                return 'Enter a valid target amount.';
-                              }
-                              return null;
-                            },
-                          ),
-                          const SizedBox(height: 16),
-                          TextFormField(
-                            controller: _deadlineController,
-                            readOnly: true,
-                            onTap: _pickDeadline,
-                            decoration: const InputDecoration(
-                              labelText: 'Deadline',
-                              prefixIcon: Icon(Icons.event_rounded),
-                            ),
-                            validator: (String? value) {
-                              if (_deadline == null) {
-                                return 'Choose a deadline.';
-                              }
-                              return null;
-                            },
-                          ),
-                          const SizedBox(height: 20),
-                          ElevatedButton.icon(
-                            onPressed: _isSaving ? null : _saveGoal,
-                            icon: const Icon(Icons.add_task_rounded),
-                            label: Text(_isSaving ? 'Saving...' : 'Save goal'),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-              GlassCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Text(
-                      'Saved goals',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        color: onSurface,
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    if (snapshot.connectionState == ConnectionState.waiting)
-                      const Center(
-                        child: Padding(
-                          padding: EdgeInsets.symmetric(vertical: 24),
-                          child: CircularProgressIndicator(),
-                        ),
-                      )
-                    else if (goals.isEmpty)
-                      Text(
-                        'No goals yet. Add one to start tracking progress.',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: onSurface.withOpacity(0.7),
-                        ),
-                      )
-                    else
-                      Column(
-                        children: goals
-                            .map(
-                              (GoalModel goal) => Padding(
-                                padding: const EdgeInsets.only(bottom: 12),
-                                child: _GoalCard(goal: goal),
+                            const SizedBox(height: 20),
+                            Form(
+                              key: _formKey,
+                              child: Column(
+                                children: <Widget>[
+                                  TextFormField(
+                                    controller: _titleController,
+                                    textCapitalization:
+                                        TextCapitalization.words,
+                                    decoration: const InputDecoration(
+                                      labelText: 'Goal title',
+                                      prefixIcon: Icon(Icons.flag_rounded),
+                                    ),
+                                    validator: (String? value) {
+                                      if ((value ?? '').trim().isEmpty) {
+                                        return 'Enter a goal title.';
+                                      }
+                                      return null;
+                                    },
+                                  ),
+                                  const SizedBox(height: 16),
+                                  TextFormField(
+                                    controller: _targetController,
+                                    keyboardType:
+                                        const TextInputType.numberWithOptions(
+                                          decimal: true,
+                                        ),
+                                    decoration: InputDecoration(
+                                      labelText:
+                                          'Target amount ($currencyCode)',
+                                      prefixText:
+                                          '${CurrencyPreferenceController.instance.optionFor(currencyCode).symbol} ',
+                                      prefixIcon: const Icon(
+                                        Icons.savings_rounded,
+                                      ),
+                                    ),
+                                    validator: (String? value) {
+                                      final double? amount = double.tryParse(
+                                        value?.trim() ?? '',
+                                      );
+                                      if (amount == null || amount <= 0) {
+                                        return 'Enter a valid target amount.';
+                                      }
+                                      return null;
+                                    },
+                                  ),
+                                  const SizedBox(height: 16),
+                                  TextFormField(
+                                    controller: _deadlineController,
+                                    readOnly: true,
+                                    onTap: _pickDeadline,
+                                    decoration: const InputDecoration(
+                                      labelText: 'Deadline',
+                                      prefixIcon: Icon(Icons.event_rounded),
+                                    ),
+                                    validator: (String? value) {
+                                      if (_deadline == null) {
+                                        return 'Choose a deadline.';
+                                      }
+                                      return null;
+                                    },
+                                  ),
+                                  const SizedBox(height: 20),
+                                  ElevatedButton.icon(
+                                    onPressed: _isSaving
+                                        ? null
+                                        : () => _saveGoal(currencyCode),
+                                    icon: const Icon(Icons.add_task_rounded),
+                                    label: Text(
+                                      _isSaving ? 'Saving...' : 'Save goal',
+                                    ),
+                                  ),
+                                ],
                               ),
-                            )
-                            .toList(),
+                            ),
+                          ],
+                        ),
                       ),
-                  ],
-                ),
-              ),
-            ],
-          ),
+                      const SizedBox(height: 16),
+                      GlassCard(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: <Widget>[
+                            Text(
+                              'Saved goals',
+                              style: Theme.of(context).textTheme.titleLarge
+                                  ?.copyWith(
+                                    fontWeight: FontWeight.w800,
+                                    color: onSurface,
+                                  ),
+                            ),
+                            const SizedBox(height: 14),
+                            if (snapshot.connectionState ==
+                                ConnectionState.waiting)
+                              const Center(
+                                child: Padding(
+                                  padding: EdgeInsets.symmetric(vertical: 24),
+                                  child: CircularProgressIndicator(),
+                                ),
+                              )
+                            else if (goals.isEmpty)
+                              Text(
+                                'No goals yet. Add one to start tracking progress.',
+                                style: Theme.of(context).textTheme.bodyMedium
+                                    ?.copyWith(
+                                      color: onSurface.withOpacity(0.7),
+                                    ),
+                              )
+                            else
+                              Column(
+                                children: goals
+                                    .map(
+                                      (GoalModel goal) => Padding(
+                                        padding: const EdgeInsets.only(
+                                          bottom: 12,
+                                        ),
+                                        child: _GoalCard(
+                                          goal: goal,
+                                          availableNetDisplay:
+                                              availableNetDisplay,
+                                          currencyCode: currencyCode,
+                                        ),
+                                      ),
+                                    )
+                                    .toList(),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            );
+          },
         );
       },
     );
@@ -267,9 +322,131 @@ class _GoalsViewState extends State<GoalsView> {
 }
 
 class _GoalCard extends StatelessWidget {
-  const _GoalCard({required this.goal});
+  const _GoalCard({
+    required this.goal,
+    required this.availableNetDisplay,
+    required this.currencyCode,
+  });
 
   final GoalModel goal;
+  final double availableNetDisplay;
+  final String currencyCode;
+
+  Future<void> _addSavings(BuildContext context) async {
+    final TextEditingController amountController = TextEditingController();
+    final GlobalKey<FormState> formKey = GlobalKey<FormState>();
+    bool isSaving = false;
+
+    Future<void> submit(StateSetter setState) async {
+      if (!(formKey.currentState?.validate() ?? false)) {
+        return;
+      }
+
+      final User? user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Sign in again to continue.')),
+        );
+        return;
+      }
+
+      final double amount = double.parse(amountController.text.trim());
+      setState(() {
+        isSaving = true;
+      });
+
+      try {
+        await BudgetFirestoreService.instance.addSavingsToGoal(
+          user: user,
+          goalId: goal.id,
+          amount: amount,
+          currencyCode: currencyCode,
+        );
+
+        if (context.mounted) {
+          Navigator.of(context).pop();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Goal progress updated.')),
+          );
+        }
+      } on FirebaseException catch (error) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error.message ?? 'Unable to update goal.')),
+        );
+      } catch (_) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Unable to update goal.')));
+      } finally {
+        if (context.mounted) {
+          setState(() {
+            isSaving = false;
+          });
+        }
+      }
+    }
+
+    await showDialog<void>(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        final double remainingDisplay = CurrencyPreferenceController.instance
+            .fromBaseAmount(
+              goal.targetAmount - goal.currentAmount,
+              currencyCode,
+            );
+
+        return StatefulBuilder(
+          builder: (BuildContext context, StateSetter setState) {
+            return AlertDialog(
+              title: Text('Add savings to ${goal.title}'),
+              content: Form(
+                key: formKey,
+                child: TextFormField(
+                  controller: amountController,
+                  autofocus: true,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  decoration: InputDecoration(
+                    labelText: 'Savings amount ($currencyCode)',
+                    prefixText:
+                        '${CurrencyPreferenceController.instance.optionFor(currencyCode).symbol} ',
+                    helperText:
+                        'Available net: ${CurrencyPreferenceController.instance.optionFor(currencyCode).symbol}${availableNetDisplay.toStringAsFixed(2)}',
+                  ),
+                  validator: (String? value) {
+                    final double? amount = double.tryParse(value?.trim() ?? '');
+                    if (amount == null || amount <= 0) {
+                      return 'Enter a valid amount.';
+                    }
+                    if (amount > availableNetDisplay) {
+                      return 'Amount is greater than the current net value.';
+                    }
+                    if (amount > remainingDisplay) {
+                      return 'Amount is greater than the remaining target.';
+                    }
+                    return null;
+                  },
+                ),
+              ),
+              actions: <Widget>[
+                TextButton(
+                  onPressed: isSaving
+                      ? null
+                      : () => Navigator.of(dialogContext).pop(),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: isSaving ? null : () => submit(setState),
+                  child: Text(isSaving ? 'Saving...' : 'Update goal'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -277,6 +454,11 @@ class _GoalCard extends StatelessWidget {
     final double ratio = goal.targetAmount <= 0
         ? 0
         : (goal.currentAmount / goal.targetAmount).clamp(0.0, 1.0);
+    final double currentDisplayAmount = CurrencyPreferenceController.instance
+        .fromBaseAmount(goal.currentAmount, currencyCode);
+    final double targetDisplayAmount = CurrencyPreferenceController.instance
+        .fromBaseAmount(goal.targetAmount, currencyCode);
+    final double remaining = targetDisplayAmount - currentDisplayAmount;
 
     return Container(
       width: double.infinity,
@@ -309,16 +491,39 @@ class _GoalCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 10),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(999),
-            child: LinearProgressIndicator(value: ratio, minHeight: 8),
+          Container(
+            height: 14,
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surfaceVariant,
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(999),
+              child: LinearProgressIndicator(
+                value: ratio,
+                minHeight: 14,
+                backgroundColor: Theme.of(context).colorScheme.surfaceVariant,
+                valueColor: AlwaysStoppedAnimation<Color>(
+                  Theme.of(context).colorScheme.primary,
+                ),
+              ),
+            ),
           ),
           const SizedBox(height: 10),
           Text(
-            '${goal.currentAmount.toStringAsFixed(2)} / ${goal.targetAmount.toStringAsFixed(2)}',
+            'Raised ${CurrencyPreferenceController.instance.formatBaseAmount(goal.currentAmount, currencyCode)} of ${CurrencyPreferenceController.instance.formatBaseAmount(goal.targetAmount, currencyCode)}',
             style: Theme.of(
               context,
             ).textTheme.bodyMedium?.copyWith(color: onSurface.withOpacity(0.7)),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            remaining <= 0
+                ? 'Goal reached'
+                : 'Remaining ${CurrencyPreferenceController.instance.formatBaseAmount(goal.targetAmount - goal.currentAmount, currencyCode)}',
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: onSurface.withOpacity(0.6)),
           ),
           const SizedBox(height: 4),
           Text(
@@ -326,6 +531,15 @@ class _GoalCard extends StatelessWidget {
             style: Theme.of(
               context,
             ).textTheme.bodySmall?.copyWith(color: onSurface.withOpacity(0.6)),
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: ratio >= 1 ? null : () => _addSavings(context),
+              icon: const Icon(Icons.savings_outlined),
+              label: const Text('Add savings'),
+            ),
           ),
         ],
       ),

@@ -1,11 +1,13 @@
 // ignore_for_file: deprecated_member_use
 
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 import 'add_transaction.dart';
 import 'goals.dart';
 import 'home.dart';
 import 'profile.dart';
+import '../auth/user_profile_service.dart';
 import '../theme_controller.dart';
 import '../widgets/neon_surface.dart';
 
@@ -20,6 +22,15 @@ class MainWrapperScreen extends StatefulWidget {
 
 class _MainWrapperScreenState extends State<MainWrapperScreen> {
   int _selectedIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    final User? user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      UserProfileService.instance.loadPreferredCurrencyForUser(user);
+    }
+  }
 
   void _handleTabChanged(int index) {
     setState(() {
