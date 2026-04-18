@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import 'google_auth_service.dart';
+import 'user_profile_service.dart';
 import '../screens/main_wrapper.dart';
 import '../theme_controller.dart';
 import '../widgets/neon_surface.dart';
@@ -43,10 +44,16 @@ class _SignInScreenState extends State<SignInScreen> {
     });
 
     try {
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
-        email: _emailController.text.trim(),
-        password: _passwordController.text,
-      );
+      final UserCredential credential = await FirebaseAuth.instance
+          .signInWithEmailAndPassword(
+            email: _emailController.text.trim(),
+            password: _passwordController.text,
+          );
+
+      final User? user = credential.user;
+      if (user != null) {
+        await UserProfileService.instance.ensureUserDocumentSafely(user: user);
+      }
 
       if (!mounted) {
         return;
@@ -77,7 +84,13 @@ class _SignInScreenState extends State<SignInScreen> {
     });
 
     try {
-      await _googleAuthService.signInWithGoogle();
+      final UserCredential credential = await _googleAuthService
+          .signInWithGoogle();
+
+      final User? user = credential.user;
+      if (user != null) {
+        await UserProfileService.instance.ensureUserDocumentSafely(user: user);
+      }
 
       if (!mounted) {
         return;

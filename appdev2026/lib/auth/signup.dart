@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import 'google_auth_service.dart';
+import 'user_profile_service.dart';
 import '../screens/main_wrapper.dart';
 import '../theme_controller.dart';
 import '../widgets/neon_surface.dart';
@@ -20,6 +21,7 @@ class SignUpScreen extends StatefulWidget {
 class _SignUpScreenState extends State<SignUpScreen> {
   final GoogleAuthService _googleAuthService = const GoogleAuthService();
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+  final TextEditingController _nameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _confirmPasswordController =
@@ -29,6 +31,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
   @override
   void dispose() {
+    _nameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
@@ -45,10 +48,24 @@ class _SignUpScreenState extends State<SignUpScreen> {
     });
 
     try {
-      await FirebaseAuth.instance.createUserWithEmailAndPassword(
-        email: _emailController.text.trim(),
-        password: _passwordController.text,
-      );
+      final UserCredential credential = await FirebaseAuth.instance
+          .createUserWithEmailAndPassword(
+            email: _emailController.text.trim(),
+            password: _passwordController.text,
+          );
+
+      final User? user = credential.user;
+      final String name = _nameController.text.trim();
+
+      if (user != null) {
+        await user.updateDisplayName(name);
+        await user.reload();
+        final User? refreshedUser = FirebaseAuth.instance.currentUser;
+        await UserProfileService.instance.ensureUserDocumentSafely(
+          user: refreshedUser ?? user,
+          preferredName: name,
+        );
+      }
 
       if (!mounted) {
         return;
@@ -77,7 +94,13 @@ class _SignUpScreenState extends State<SignUpScreen> {
     });
 
     try {
-      await _googleAuthService.signInWithGoogle();
+      final UserCredential credential = await _googleAuthService
+          .signInWithGoogle();
+
+      final User? user = credential.user;
+      if (user != null) {
+        await UserProfileService.instance.ensureUserDocumentSafely(user: user);
+      }
 
       if (!mounted) {
         return;
@@ -155,6 +178,26 @@ class _SignUpScreenState extends State<SignUpScreen> {
                             ),
                       ),
                       const SizedBox(height: 24),
+                      TextFormField(
+                        controller: _nameController,
+                        textCapitalization: TextCapitalization.words,
+                        autofillHints: const <String>[AutofillHints.name],
+                        decoration: const InputDecoration(
+                          labelText: 'Full name',
+                          prefixIcon: Icon(Icons.person_outline_rounded),
+                        ),
+                        validator: (String? value) {
+                          final String text = value?.trim() ?? '';
+                          if (text.isEmpty) {
+                            return 'Enter your name.';
+                          }
+                          if (text.length < 2) {
+                            return 'Name must be at least 2 characters.';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
                       TextFormField(
                         controller: _emailController,
                         keyboardType: TextInputType.emailAddress,
