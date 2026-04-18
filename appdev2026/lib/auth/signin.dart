@@ -52,7 +52,11 @@ class _SignInScreenState extends State<SignInScreen> {
 
       final User? user = credential.user;
       if (user != null) {
-        await UserProfileService.instance.ensureUserDocumentSafely(user: user);
+        final bool synced = await UserProfileService.instance
+            .ensureUserDocumentSafely(user: user);
+        if (!synced && mounted) {
+          _showMessage('Signed in, but Firebase sync needs attention.');
+        }
       }
 
       if (!mounted) {
@@ -89,7 +93,11 @@ class _SignInScreenState extends State<SignInScreen> {
 
       final User? user = credential.user;
       if (user != null) {
-        await UserProfileService.instance.ensureUserDocumentSafely(user: user);
+        final bool synced = await UserProfileService.instance
+            .ensureUserDocumentSafely(user: user);
+        if (!synced && mounted) {
+          _showMessage('Signed in, but Firebase sync needs attention.');
+        }
       }
 
       if (!mounted) {

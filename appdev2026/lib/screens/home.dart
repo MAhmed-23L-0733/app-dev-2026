@@ -1,8 +1,11 @@
 // ignore_for_file: deprecated_member_use
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
+import '../models/transaction.dart';
+import '../services/budget_firestore_service.dart';
 import '../widgets/neon_surface.dart';
 
 class HomeView extends StatelessWidget {
@@ -11,157 +14,294 @@ class HomeView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final User? user = FirebaseAuth.instance.currentUser;
-    final String name = _displayName(user);
-    final String email = user?.email ?? 'No email linked';
-    final String provider = _providerLabel(user);
-    final String joined = _formatDate(user?.metadata.creationTime);
-    final String lastSignIn = _formatDate(user?.metadata.lastSignInTime);
     final Color onSurface = Theme.of(context).colorScheme.onSurface;
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 120),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: <Widget>[
-          GlassCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Row(
-                  children: <Widget>[
-                    Container(
-                      width: 58,
-                      height: 58,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: LinearGradient(
-                          colors: <Color>[
-                            Theme.of(context).colorScheme.primary,
-                            Colors.blueAccent,
-                          ],
-                        ),
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        _initials(user),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 20,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
+    if (user == null) {
+      return Center(
+        child: Text(
+          'Sign in to view your budget dashboard.',
+          style: Theme.of(
+            context,
+          ).textTheme.titleMedium?.copyWith(color: onSurface),
+        ),
+      );
+    }
+
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream: BudgetFirestoreService.instance.watchMonthlySummary(user),
+      builder:
+          (
+            BuildContext context,
+            AsyncSnapshot<DocumentSnapshot<Map<String, dynamic>>>
+            summarySnapshot,
+          ) {
+            final _BudgetSummary summary = _BudgetSummary.fromMap(
+              summarySnapshot.data?.data(),
+            );
+
+            return StreamBuilder<List<TransactionModel>>(
+              stream: BudgetFirestoreService.instance
+                  .watchCurrentMonthTransactions(user),
+              builder:
+                  (
+                    BuildContext context,
+                    AsyncSnapshot<List<TransactionModel>> transactionsSnapshot,
+                  ) {
+                    final List<TransactionModel> transactions =
+                        transactionsSnapshot.data ?? <TransactionModel>[];
+                    final double balance =
+                        summary.incomeTotal - summary.expenseTotal;
+
+                    return SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(20, 12, 20, 120),
                       child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: <Widget>[
-                          Text(
-                            'Welcome back, $name',
-                            style: Theme.of(context).textTheme.headlineMedium
-                                ?.copyWith(
-                                  fontWeight: FontWeight.w800,
-                                  color: onSurface,
+                          GlassCard(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: <Widget>[
+                                Row(
+                                  children: <Widget>[
+                                    Container(
+                                      width: 58,
+                                      height: 58,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        gradient: LinearGradient(
+                                          colors: <Color>[
+                                            Theme.of(
+                                              context,
+                                            ).colorScheme.primary,
+                                            Colors.blueAccent,
+                                          ],
+                                        ),
+                                      ),
+                                      alignment: Alignment.center,
+                                      child: Text(
+                                        _initials(user),
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 20,
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 14),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: <Widget>[
+                                          Text(
+                                            'Monthly budget dashboard',
+                                            style: Theme.of(context)
+                                                .textTheme
+                                                .headlineMedium
+                                                ?.copyWith(
+                                                  fontWeight: FontWeight.w800,
+                                                  color: onSurface,
+                                                ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            _displayName(user),
+                                            style: Theme.of(context)
+                                                .textTheme
+                                                .bodyMedium
+                                                ?.copyWith(
+                                                  color: onSurface.withOpacity(
+                                                    0.74,
+                                                  ),
+                                                ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
                                 ),
+                                const SizedBox(height: 18),
+                                Text(
+                                  'Total monthly spendings',
+                                  style: Theme.of(context).textTheme.labelLarge
+                                      ?.copyWith(
+                                        color: onSurface.withOpacity(0.7),
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  _formatMoney(summary.expenseTotal),
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .displaySmall
+                                      ?.copyWith(
+                                        fontWeight: FontWeight.w900,
+                                        color: onSurface,
+                                      ),
+                                ),
+                                const SizedBox(height: 10),
+                                Text(
+                                  'Updated for ${summary.monthLabel}',
+                                  style: Theme.of(context).textTheme.bodyMedium
+                                      ?.copyWith(
+                                        color: onSurface.withOpacity(0.72),
+                                      ),
+                                ),
+                              ],
+                            ),
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            email,
-                            style: Theme.of(context).textTheme.bodyMedium
-                                ?.copyWith(color: onSurface.withOpacity(0.74)),
+                          const SizedBox(height: 16),
+                          Row(
+                            children: <Widget>[
+                              Expanded(
+                                child: _MetricTile(
+                                  label: 'Income',
+                                  value: _formatMoney(summary.incomeTotal),
+                                  icon: Icons.trending_up_rounded,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: _MetricTile(
+                                  label: 'Spendings',
+                                  value: _formatMoney(summary.expenseTotal),
+                                  icon: Icons.trending_down_rounded,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          GlassCard(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: <Widget>[
+                                Text(
+                                  'Net balance',
+                                  style: Theme.of(context).textTheme.titleLarge
+                                      ?.copyWith(
+                                        fontWeight: FontWeight.w800,
+                                        color: onSurface,
+                                      ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  _formatMoney(balance),
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .headlineMedium
+                                      ?.copyWith(
+                                        fontWeight: FontWeight.w900,
+                                        color: balance >= 0
+                                            ? Theme.of(
+                                                context,
+                                              ).colorScheme.primary
+                                            : Theme.of(
+                                                context,
+                                              ).colorScheme.error,
+                                      ),
+                                ),
+                                const SizedBox(height: 10),
+                                Text(
+                                  'Income minus spendings for the current month.',
+                                  style: Theme.of(context).textTheme.bodyMedium
+                                      ?.copyWith(
+                                        color: onSurface.withOpacity(0.72),
+                                      ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          GlassCard(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: <Widget>[
+                                Text(
+                                  'Recent transactions',
+                                  style: Theme.of(context).textTheme.titleLarge
+                                      ?.copyWith(
+                                        fontWeight: FontWeight.w800,
+                                        color: onSurface,
+                                      ),
+                                ),
+                                const SizedBox(height: 14),
+                                if (transactionsSnapshot.connectionState ==
+                                    ConnectionState.waiting)
+                                  const Center(
+                                    child: Padding(
+                                      padding: EdgeInsets.symmetric(
+                                        vertical: 24,
+                                      ),
+                                      child: CircularProgressIndicator(),
+                                    ),
+                                  )
+                                else if (transactions.isEmpty)
+                                  Text(
+                                    'No transactions added this month yet.',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodyMedium
+                                        ?.copyWith(
+                                          color: onSurface.withOpacity(0.7),
+                                        ),
+                                  )
+                                else
+                                  Column(
+                                    children: transactions
+                                        .take(6)
+                                        .map(
+                                          (TransactionModel transaction) =>
+                                              Padding(
+                                                padding: const EdgeInsets.only(
+                                                  bottom: 12,
+                                                ),
+                                                child: _TransactionRow(
+                                                  transaction: transaction,
+                                                ),
+                                              ),
+                                        )
+                                        .toList(),
+                                  ),
+                              ],
+                            ),
                           ),
                         ],
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Signed in through Firebase Auth and ready to use your live account data.',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: onSurface.withOpacity(0.74),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                Row(
-                  children: <Widget>[
-                    Expanded(
-                      child: _MetricTile(
-                        label: 'Verified',
-                        value: user?.emailVerified == true ? 'Yes' : 'No',
-                        icon: Icons.verified_rounded,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _MetricTile(
-                        label: 'Provider',
-                        value: provider,
-                        icon: Icons.manage_accounts_rounded,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: <Widget>[
-              Expanded(
-                child: _ActionChipCard(
-                  icon: Icons.login_rounded,
-                  title: 'Last sign-in',
-                  subtitle: lastSignIn,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _ActionChipCard(
-                  icon: Icons.calendar_today_rounded,
-                  title: 'Joined',
-                  subtitle: joined,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          GlassCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(
-                  'Account activity',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    color: onSurface,
-                  ),
-                ),
-                const SizedBox(height: 14),
-                _ActivityRow(
-                  icon: Icons.person_rounded,
-                  title: 'Signed in as $name',
-                  subtitle: email,
-                ),
-                const SizedBox(height: 12),
-                _ActivityRow(
-                  icon: Icons.verified_user_rounded,
-                  title: 'Authentication provider',
-                  subtitle: provider,
-                ),
-                const SizedBox(height: 12),
-                _ActivityRow(
-                  icon: Icons.sync_rounded,
-                  title: 'Email verification',
-                  subtitle: user?.emailVerified == true
-                      ? 'Verified'
-                      : 'Not verified',
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
+                    );
+                  },
+            );
+          },
+    );
+  }
+}
+
+class _BudgetSummary {
+  const _BudgetSummary({
+    required this.monthLabel,
+    required this.incomeTotal,
+    required this.expenseTotal,
+  });
+
+  final String monthLabel;
+  final double incomeTotal;
+  final double expenseTotal;
+
+  factory _BudgetSummary.fromMap(Map<String, dynamic>? data) {
+    final DateTime now = DateTime.now();
+    final String defaultMonthLabel = _monthLabel(now);
+    if (data == null) {
+      return _BudgetSummary(
+        monthLabel: defaultMonthLabel,
+        incomeTotal: 0,
+        expenseTotal: 0,
+      );
+    }
+
+    return _BudgetSummary(
+      monthLabel: data['monthLabel'] as String? ?? defaultMonthLabel,
+      incomeTotal: (data['incomeTotal'] as num? ?? 0).toDouble(),
+      expenseTotal: (data['expenseTotal'] as num? ?? 0).toDouble(),
     );
   }
 }
@@ -203,38 +343,7 @@ String _initials(User? user) {
       .toUpperCase();
 }
 
-String _providerLabel(User? user) {
-  final List<String> providers =
-      user?.providerData
-          .map((UserInfo info) => info.providerId)
-          .where((String providerId) => providerId.isNotEmpty)
-          .toSet()
-          .toList() ??
-      <String>[];
-
-  if (providers.isEmpty) {
-    return 'Email';
-  }
-
-  return providers
-      .map((String providerId) {
-        switch (providerId) {
-          case 'google.com':
-            return 'Google';
-          case 'password':
-            return 'Email';
-          default:
-            return providerId;
-        }
-      })
-      .join(', ');
-}
-
-String _formatDate(DateTime? value) {
-  if (value == null) {
-    return 'Unavailable';
-  }
-
+String _monthLabel(DateTime value) {
   const List<String> months = <String>[
     'Jan',
     'Feb',
@@ -250,7 +359,12 @@ String _formatDate(DateTime? value) {
     'Dec',
   ];
 
-  return '${months[value.month - 1]} ${value.day}, ${value.year}';
+  return '${months[value.month - 1]} ${value.year}';
+}
+
+String _formatMoney(double amount) {
+  final String prefix = amount < 0 ? '-' : '';
+  return '$prefix\$${amount.abs().toStringAsFixed(2)}';
 }
 
 class _MetricTile extends StatelessWidget {
@@ -294,69 +408,19 @@ class _MetricTile extends StatelessWidget {
   }
 }
 
-class _ActionChipCard extends StatelessWidget {
-  const _ActionChipCard({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-  });
+class _TransactionRow extends StatelessWidget {
+  const _TransactionRow({required this.transaction});
 
-  final IconData icon;
-  final String title;
-  final String subtitle;
+  final TransactionModel transaction;
 
   @override
   Widget build(BuildContext context) {
     final Color onSurface = Theme.of(context).colorScheme.onSurface;
-    return GlassCard(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: Theme.of(context).colorScheme.primary.withOpacity(0.16),
-            ),
-            child: Icon(icon, color: Theme.of(context).colorScheme.primary),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            title,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w800,
-              color: onSurface,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            subtitle,
-            style: Theme.of(
-              context,
-            ).textTheme.bodySmall?.copyWith(color: onSurface.withOpacity(0.72)),
-          ),
-        ],
-      ),
-    );
-  }
-}
+    final bool isIncome = transaction.type == 'income';
+    final Color accent = isIncome
+        ? Theme.of(context).colorScheme.primary
+        : Theme.of(context).colorScheme.error;
 
-class _ActivityRow extends StatelessWidget {
-  const _ActivityRow({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-  });
-
-  final IconData icon;
-  final String title;
-  final String subtitle;
-
-  @override
-  Widget build(BuildContext context) {
-    final Color onSurface = Theme.of(context).colorScheme.onSurface;
     return Row(
       children: <Widget>[
         Container(
@@ -364,9 +428,12 @@ class _ActivityRow extends StatelessWidget {
           height: 46,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: Theme.of(context).colorScheme.primary.withOpacity(0.14),
+            color: accent.withOpacity(0.14),
           ),
-          child: Icon(icon, color: Theme.of(context).colorScheme.primary),
+          child: Icon(
+            isIncome ? Icons.add_rounded : Icons.remove_rounded,
+            color: accent,
+          ),
         ),
         const SizedBox(width: 14),
         Expanded(
@@ -374,7 +441,7 @@ class _ActivityRow extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
               Text(
-                title,
+                transaction.category,
                 style: Theme.of(context).textTheme.titleSmall?.copyWith(
                   fontWeight: FontWeight.w700,
                   color: onSurface,
@@ -382,12 +449,19 @@ class _ActivityRow extends StatelessWidget {
               ),
               const SizedBox(height: 3),
               Text(
-                subtitle,
+                transaction.note.isEmpty ? 'No note added' : transaction.note,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: onSurface.withOpacity(0.68),
                 ),
               ),
             ],
+          ),
+        ),
+        Text(
+          '${isIncome ? '+' : '-'}\$${transaction.amount.toStringAsFixed(2)}',
+          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.w800,
+            color: accent,
           ),
         ),
       ],

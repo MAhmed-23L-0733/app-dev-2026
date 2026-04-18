@@ -61,10 +61,14 @@ class _SignUpScreenState extends State<SignUpScreen> {
         await user.updateDisplayName(name);
         await user.reload();
         final User? refreshedUser = FirebaseAuth.instance.currentUser;
-        await UserProfileService.instance.ensureUserDocumentSafely(
-          user: refreshedUser ?? user,
-          preferredName: name,
-        );
+        final bool synced = await UserProfileService.instance
+            .ensureUserDocumentSafely(
+              user: refreshedUser ?? user,
+              preferredName: name,
+            );
+        if (!synced && mounted) {
+          _showMessage('Account created, but Firebase sync needs attention.');
+        }
       }
 
       if (!mounted) {
@@ -99,7 +103,11 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
       final User? user = credential.user;
       if (user != null) {
-        await UserProfileService.instance.ensureUserDocumentSafely(user: user);
+        final bool synced = await UserProfileService.instance
+            .ensureUserDocumentSafely(user: user);
+        if (!synced && mounted) {
+          _showMessage('Account created, but Firebase sync needs attention.');
+        }
       }
 
       if (!mounted) {

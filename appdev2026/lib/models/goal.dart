@@ -25,13 +25,14 @@ class GoalModel {
   }
 
   factory GoalModel.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
+    final Map<String, dynamic> data =
+        (doc.data() as Map<String, dynamic>?) ?? <String, dynamic>{};
     return GoalModel(
       id: doc.id,
-      title: data['title'] ?? '',
-      targetAmount: (data['targetAmount'] ?? 0.0).toDouble(),
-      currentAmount: (data['currentAmount'] ?? 0.0).toDouble(),
-      deadline: data['deadline'] as Timestamp,
+      title: data['title'] as String? ?? '',
+      targetAmount: (data['targetAmount'] as num? ?? 0).toDouble(),
+      currentAmount: (data['currentAmount'] as num? ?? 0).toDouble(),
+      deadline: data['deadline'] as Timestamp? ?? Timestamp.now(),
     );
   }
 }

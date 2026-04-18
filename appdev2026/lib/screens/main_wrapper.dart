@@ -2,10 +2,12 @@
 
 import 'package:flutter/material.dart';
 
-import '../theme_controller.dart';
-import '../widgets/neon_surface.dart';
+import 'add_transaction.dart';
+import 'goals.dart';
 import 'home.dart';
 import 'profile.dart';
+import '../theme_controller.dart';
+import '../widgets/neon_surface.dart';
 
 class MainWrapperScreen extends StatefulWidget {
   const MainWrapperScreen({super.key});
@@ -27,7 +29,11 @@ class _MainWrapperScreenState extends State<MainWrapperScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final List<String> titles = <String>['Dashboard', 'Profile'];
+    final List<String> titles = <String>[
+      'Dashboard',
+      'Add transaction',
+      'Goals',
+    ];
 
     return Scaffold(
       extendBody: true,
@@ -35,6 +41,15 @@ class _MainWrapperScreenState extends State<MainWrapperScreen> {
       appBar: AppBar(
         title: Text(titles[_selectedIndex]),
         actions: <Widget>[
+          IconButton(
+            tooltip: 'Profile',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(builder: (_) => const ProfileView()),
+              );
+            },
+            icon: const Icon(Icons.person_rounded),
+          ),
           IconButton(
             tooltip: 'Toggle theme',
             onPressed: appThemeController.toggleTheme,
@@ -51,29 +66,36 @@ class _MainWrapperScreenState extends State<MainWrapperScreen> {
         child: SafeArea(
           child: IndexedStack(
             index: _selectedIndex,
-            children: const <Widget>[HomeView(), ProfileView()],
+            children: const <Widget>[
+              HomeView(),
+              AddTransactionView(),
+              GoalsView(),
+            ],
           ),
         ),
       ),
       bottomNavigationBar: Padding(
-        // Increased the bottom padding to 16 so the pill floats nicely
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(28),
           child: MediaQuery.removePadding(
             context: context,
-            removeBottom: true, // This removes the internal empty space
+            removeBottom: true,
             child: BottomNavigationBar(
               currentIndex: _selectedIndex,
               onTap: _handleTabChanged,
               items: const <BottomNavigationBarItem>[
                 BottomNavigationBarItem(
                   icon: Icon(Icons.home_rounded),
-                  label: 'Home',
+                  label: 'Dashboard',
                 ),
                 BottomNavigationBarItem(
-                  icon: Icon(Icons.person_rounded),
-                  label: 'Profile',
+                  icon: Icon(Icons.add_circle_outline_rounded),
+                  label: 'Add transaction',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.flag_rounded),
+                  label: 'Goals',
                 ),
               ],
             ),

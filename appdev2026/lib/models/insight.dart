@@ -16,11 +16,12 @@ class InsightModel {
   }
 
   factory InsightModel.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
+    final Map<String, dynamic> data =
+        (doc.data() as Map<String, dynamic>?) ?? <String, dynamic>{};
     return InsightModel(
       id: doc.id,
-      content: data['content'] ?? '',
-      generatedAt: data['generatedAt'] as Timestamp,
+      content: data['content'] as String? ?? '',
+      generatedAt: data['generatedAt'] as Timestamp? ?? Timestamp.now(),
     );
   }
 }

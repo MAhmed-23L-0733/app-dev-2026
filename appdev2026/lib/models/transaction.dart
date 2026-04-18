@@ -31,15 +31,16 @@ class TransactionModel {
   }
 
   factory TransactionModel.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
+    final Map<String, dynamic> data =
+        (doc.data() as Map<String, dynamic>?) ?? <String, dynamic>{};
     return TransactionModel(
       id: doc.id,
-      amount: (data['amount'] ?? 0.0).toDouble(),
-      type: data['type'] ?? 'expense',
-      category: data['category'] ?? '',
-      aiCategory: data['aiCategory'] ?? '',
-      note: data['note'] ?? '',
-      timestamp: data['timestamp'] as Timestamp,
+      amount: (data['amount'] as num? ?? 0).toDouble(),
+      type: data['type'] as String? ?? 'expense',
+      category: data['category'] as String? ?? '',
+      aiCategory: data['aiCategory'] as String? ?? '',
+      note: data['note'] as String? ?? '',
+      timestamp: data['timestamp'] as Timestamp? ?? Timestamp.now(),
     );
   }
 }
