@@ -41,7 +41,7 @@ dependencies:
   firebase_core: ^4.7.0
   firebase_auth: ^6.4.0
   cloud_firestore: ^6.3.0
-  google_sign_in: ^6.2.1
+  google_sign_in: ^6.3.0
 
 dev_dependencies:
   flutter_test:
@@ -265,30 +265,36 @@ class MyApp extends StatelessWidget {
 
 ThemeData _buildTheme(Brightness brightness) {
   final bool isDark = brightness == Brightness.dark;
+
+  // Clean Black and White surfaces
   final Color surface = isDark
-      ? const Color(0xFF160C26)
+      ? const Color(0xFF121212)
       : const Color(0xFFFFFFFF);
   final Color onSurface = isDark
-      ? const Color(0xFFF6EEFF)
-      : const Color(0xFF140A24);
-  final Color primary = isDark ? Colors.purpleAccent : const Color(0xFF6E3BFF);
-  final Color secondary = isDark
-      ? Colors.deepPurpleAccent
-      : const Color(0xFF8D5CFF);
+      ? const Color(0xFFFFFFFF)
+      : const Color(0xFF000000);
 
-  final Color appBarBackground = surface.withOpacity(isDark ? 0.58 : 0.78);
-  final Color cardBackground = surface.withOpacity(isDark ? 0.16 : 0.88);
+  // Blue accents
+  final Color primary = isDark
+      ? const Color(0xFF64B5F6)
+      : const Color(0xFF1976D2);
+  final Color secondary = isDark
+      ? const Color(0xFF42A5F5)
+      : const Color(0xFF1565C0);
+
+  final Color appBarBackground = surface.withOpacity(isDark ? 0.90 : 0.95);
+  final Color cardBackground = surface.withOpacity(isDark ? 0.40 : 0.95);
   final Color fieldBackground = isDark
       ? Colors.white.withOpacity(0.08)
-      : const Color(0xFFF0EAFE);
-  final Color navBackground = surface.withOpacity(isDark ? 0.62 : 0.92);
+      : const Color(0xFFF0F4F8);
+  final Color navBackground = surface.withOpacity(isDark ? 0.90 : 0.95);
 
   final ColorScheme colorScheme = ColorScheme(
     brightness: brightness,
     primary: primary,
-    onPrimary: isDark ? const Color(0xFF18051E) : Colors.white,
+    onPrimary: Colors.white,
     secondary: secondary,
-    onSecondary: isDark ? const Color(0xFF140A24) : Colors.white,
+    onSecondary: Colors.white,
     error: const Color(0xFFFF6B93),
     onError: Colors.white,
     surface: surface,
@@ -297,11 +303,11 @@ ThemeData _buildTheme(Brightness brightness) {
     onSurfaceVariant: onSurface.withOpacity(0.74),
     outline: primary.withOpacity(0.35),
     shadow: Colors.black,
-    inverseSurface: isDark ? const Color(0xFFF8F3FF) : const Color(0xFF1A1028),
+    inverseSurface: isDark ? const Color(0xFFFFFFFF) : const Color(0xFF121212),
     onInverseSurface: isDark
-        ? const Color(0xFF1A1028)
-        : const Color(0xFFF8F3FF),
-    tertiary: const Color(0xFF00E5FF),
+        ? const Color(0xFF121212)
+        : const Color(0xFFFFFFFF),
+    tertiary: const Color(0xFF00B0FF),
     onTertiary: Colors.black,
   );
 
@@ -361,7 +367,7 @@ ThemeData _buildTheme(Brightness brightness) {
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
         backgroundColor: primary,
-        foregroundColor: isDark ? const Color(0xFF0C0512) : Colors.white,
+        foregroundColor: Colors.white,
         minimumSize: const Size.fromHeight(56),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
         elevation: 0,
@@ -475,6 +481,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import 'google_auth_service.dart';
+import 'user_profile_service.dart';
 import '../screens/main_wrapper.dart';
 import '../theme_controller.dart';
 import '../widgets/neon_surface.dart';
@@ -514,10 +521,16 @@ class _SignInScreenState extends State<SignInScreen> {
     });
 
     try {
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
-        email: _emailController.text.trim(),
-        password: _passwordController.text,
-      );
+      final UserCredential credential = await FirebaseAuth.instance
+          .signInWithEmailAndPassword(
+            email: _emailController.text.trim(),
+            password: _passwordController.text,
+          );
+
+      final User? user = credential.user;
+      if (user != null) {
+        await UserProfileService.instance.ensureUserDocumentSafely(user: user);
+      }
 
       if (!mounted) {
         return;
@@ -548,7 +561,13 @@ class _SignInScreenState extends State<SignInScreen> {
     });
 
     try {
-      await _googleAuthService.signInWithGoogle();
+      final UserCredential credential = await _googleAuthService
+          .signInWithGoogle();
+
+      final User? user = credential.user;
+      if (user != null) {
+        await UserProfileService.instance.ensureUserDocumentSafely(user: user);
+      }
 
       if (!mounted) {
         return;
@@ -779,6 +798,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import 'google_auth_service.dart';
+import 'user_profile_service.dart';
 import '../screens/main_wrapper.dart';
 import '../theme_controller.dart';
 import '../widgets/neon_surface.dart';
@@ -795,6 +815,7 @@ class SignUpScreen extends StatefulWidget {
 class _SignUpScreenState extends State<SignUpScreen> {
   final GoogleAuthService _googleAuthService = const GoogleAuthService();
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+  final TextEditingController _nameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _confirmPasswordController =
@@ -804,6 +825,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
   @override
   void dispose() {
+    _nameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
@@ -820,10 +842,24 @@ class _SignUpScreenState extends State<SignUpScreen> {
     });
 
     try {
-      await FirebaseAuth.instance.createUserWithEmailAndPassword(
-        email: _emailController.text.trim(),
-        password: _passwordController.text,
-      );
+      final UserCredential credential = await FirebaseAuth.instance
+          .createUserWithEmailAndPassword(
+            email: _emailController.text.trim(),
+            password: _passwordController.text,
+          );
+
+      final User? user = credential.user;
+      final String name = _nameController.text.trim();
+
+      if (user != null) {
+        await user.updateDisplayName(name);
+        await user.reload();
+        final User? refreshedUser = FirebaseAuth.instance.currentUser;
+        await UserProfileService.instance.ensureUserDocumentSafely(
+          user: refreshedUser ?? user,
+          preferredName: name,
+        );
+      }
 
       if (!mounted) {
         return;
@@ -852,7 +888,13 @@ class _SignUpScreenState extends State<SignUpScreen> {
     });
 
     try {
-      await _googleAuthService.signInWithGoogle();
+      final UserCredential credential = await _googleAuthService
+          .signInWithGoogle();
+
+      final User? user = credential.user;
+      if (user != null) {
+        await UserProfileService.instance.ensureUserDocumentSafely(user: user);
+      }
 
       if (!mounted) {
         return;
@@ -930,6 +972,26 @@ class _SignUpScreenState extends State<SignUpScreen> {
                             ),
                       ),
                       const SizedBox(height: 24),
+                      TextFormField(
+                        controller: _nameController,
+                        textCapitalization: TextCapitalization.words,
+                        autofillHints: const <String>[AutofillHints.name],
+                        decoration: const InputDecoration(
+                          labelText: 'Full name',
+                          prefixIcon: Icon(Icons.person_outline_rounded),
+                        ),
+                        validator: (String? value) {
+                          final String text = value?.trim() ?? '';
+                          if (text.isEmpty) {
+                            return 'Enter your name.';
+                          }
+                          if (text.length < 2) {
+                            return 'Name must be at least 2 characters.';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
                       TextFormField(
                         controller: _emailController,
                         keyboardType: TextInputType.emailAddress,
@@ -1099,6 +1161,115 @@ class _GoogleGlyph extends StatelessWidget {
 
 
 ========================================
+FILE PATH: lib\auth\user_profile_service.dart
+========================================
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
+class UserProfileService {
+  const UserProfileService._();
+
+  static const UserProfileService instance = UserProfileService._();
+
+  Future<void> ensureUserDocument({
+    required User user,
+    String? preferredName,
+  }) async {
+    final DocumentReference<Map<String, dynamic>> ref = FirebaseFirestore
+        .instance
+        .collection('users')
+        .doc(user.uid);
+
+    final String name = _resolveName(user, preferredName);
+    final DocumentSnapshot<Map<String, dynamic>> snapshot = await ref.get();
+
+    if (!snapshot.exists) {
+      await ref.set(<String, dynamic>{
+        'uid': user.uid,
+        'name': name,
+        'email': user.email,
+        'photoUrl': user.photoURL,
+        'providerIds': user.providerData
+            .map((UserInfo info) => info.providerId)
+            .where((String id) => id.isNotEmpty)
+            .toList(),
+        'createdAt': FieldValue.serverTimestamp(),
+        'lastSignInAt': FieldValue.serverTimestamp(),
+      });
+      return;
+    }
+
+    await ref.set(<String, dynamic>{
+      'name': name,
+      'email': user.email,
+      'photoUrl': user.photoURL,
+      'providerIds': user.providerData
+          .map((UserInfo info) => info.providerId)
+          .where((String id) => id.isNotEmpty)
+          .toList(),
+      'lastSignInAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
+  Future<void> ensureUserDocumentSafely({
+    required User user,
+    String? preferredName,
+  }) async {
+    try {
+      await ensureUserDocument(user: user, preferredName: preferredName);
+    } catch (_) {}
+  }
+
+  String _resolveName(User user, String? preferredName) {
+    final String fromInput = preferredName?.trim() ?? '';
+    if (fromInput.isNotEmpty) {
+      return fromInput;
+    }
+
+    final String fromProfile = user.displayName?.trim() ?? '';
+    if (fromProfile.isNotEmpty) {
+      return fromProfile;
+    }
+
+    final String fromEmail = user.email?.split('@').first.trim() ?? '';
+    if (fromEmail.isNotEmpty) {
+      return fromEmail;
+    }
+
+    return 'User';
+  }
+}
+
+
+
+
+========================================
+FILE PATH: lib\models\transaction.dart
+========================================
+enum TransactionType { income, expense }
+
+class Transaction {
+  final String id;
+  final String title;
+  final double amount;
+  final DateTime date;
+  final String category;
+  final TransactionType type;
+
+  Transaction({
+    required this.id,
+    required this.title,
+    required this.amount,
+    required this.date,
+    required this.category,
+    required this.type,
+  });
+}
+
+
+
+
+========================================
 FILE PATH: lib\screens\home.dart
 ========================================
 // ignore_for_file: deprecated_member_use
@@ -1140,7 +1311,7 @@ class HomeView extends StatelessWidget {
                         gradient: LinearGradient(
                           colors: <Color>[
                             Theme.of(context).colorScheme.primary,
-                            Colors.deepPurpleAccent,
+                            Colors.blueAccent,
                           ],
                         ),
                       ),
@@ -1633,7 +1804,7 @@ class ProfileView extends StatelessWidget {
                     gradient: LinearGradient(
                       colors: <Color>[
                         Theme.of(context).colorScheme.primary,
-                        Colors.deepPurpleAccent,
+                        Colors.blueAccent,
                       ],
                     ),
                   ),
@@ -1703,10 +1874,6 @@ class ProfileView extends StatelessWidget {
                 const SizedBox(height: 14),
                 _SummaryRow(label: 'Authentication', value: provider),
                 const SizedBox(height: 12),
-                _SummaryRow(
-                  label: 'Email verified',
-                  value: user?.emailVerified == true ? 'Yes' : 'No',
-                ),
                 const SizedBox(height: 12),
                 _SummaryRow(label: 'Joined', value: joined),
                 const SizedBox(height: 12),
@@ -1915,6 +2082,7 @@ String _formatDate(DateTime? value) {
 
 
 
+
 ========================================
 FILE PATH: lib\widgets\neon_surface.dart
 ========================================
@@ -1939,8 +2107,16 @@ class NeonBackground extends StatelessWidget {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: isDark
-              ? const [Color(0xFF090512), Color(0xFF130A22), Color(0xFF070411)]
-              : const [Color(0xFFF9F5FF), Color(0xFFF3ECFF), Color(0xFFEFE6FF)],
+              ? const [
+                  Color(0xFF000000),
+                  Color(0xFF071324),
+                  Color(0xFF000000),
+                ] // Black / Dark Blue
+              : const [
+                  Color(0xFFFFFFFF),
+                  Color(0xFFF0F6FF),
+                  Color(0xFFFFFFFF),
+                ], // White / Light Blue
         ),
       ),
       child: Stack(
@@ -1949,7 +2125,7 @@ class NeonBackground extends StatelessWidget {
             top: -50,
             right: -30,
             child: _GlowCircle(
-              color: Colors.purpleAccent.withOpacity(isDark ? 0.32 : 0.16),
+              color: Colors.lightBlueAccent.withOpacity(isDark ? 0.15 : 0.12),
               size: 220,
             ),
           ),
@@ -1957,7 +2133,7 @@ class NeonBackground extends StatelessWidget {
             bottom: 60,
             left: -70,
             child: _GlowCircle(
-              color: Colors.deepPurpleAccent.withOpacity(isDark ? 0.24 : 0.14),
+              color: Colors.blueAccent.withOpacity(isDark ? 0.15 : 0.10),
               size: 260,
             ),
           ),
@@ -1969,7 +2145,7 @@ class NeonBackground extends StatelessWidget {
                     center: Alignment.topCenter,
                     radius: 1.3,
                     colors: [
-                      Colors.purpleAccent.withOpacity(isDark ? 0.10 : 0.05),
+                      Colors.blueAccent.withOpacity(isDark ? 0.08 : 0.04),
                       Colors.transparent,
                     ],
                   ),
@@ -2042,6 +2218,7 @@ class _GlowCircle extends StatelessWidget {
     );
   }
 }
+
 
 
 
