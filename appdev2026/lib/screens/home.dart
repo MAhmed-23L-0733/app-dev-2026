@@ -8,7 +8,6 @@ import '../auth/user_profile_service.dart';
 import '../services/currency_service.dart';
 import '../models/transaction.dart';
 import '../services/budget_firestore_service.dart';
-import '../services/ai_expense_service.dart'; // <-- Added AI Service Import
 import '../widgets/neon_surface.dart';
 
 class HomeView extends StatelessWidget {
@@ -236,52 +235,6 @@ class HomeView extends StatelessWidget {
                                     ),
                                   ],
                                 ),
-<<<<<<< Updated upstream
-=======
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-
-                          // ==========================================
-                          // INJECTED AI SMART INPUT CARD HERE
-                          // ==========================================
-                          const _SmartInputCard(),
-                          const SizedBox(height: 16),
-
-                          Text(
-                            'Total monthly spendings',
-                            style: Theme.of(context).textTheme.labelLarge
-                                ?.copyWith(
-                                  color: onSurface.withOpacity(0.7),
-                                  fontWeight: FontWeight.w700,
-                                ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            _formatMoney(summary.expenseTotal),
-                            style: Theme.of(context).textTheme.displaySmall
-                                ?.copyWith(
-                                  fontWeight: FontWeight.w900,
-                                  color: onSurface,
-                                ),
-                          ),
-                          const SizedBox(height: 10),
-                          Text(
-                            'Updated for ${summary.monthLabel}',
-                            style: Theme.of(context).textTheme.bodyMedium
-                                ?.copyWith(color: onSurface.withOpacity(0.72)),
-                          ),
-                          const SizedBox(height: 16),
-                          Row(
-                            children: <Widget>[
-                              Expanded(
-                                child: _MetricTile(
-                                  label: 'Income',
-                                  value: _formatMoney(summary.incomeTotal),
-                                  icon: Icons.trending_up_rounded,
-                                ),
->>>>>>> Stashed changes
                               ),
                               const SizedBox(height: 16),
                               Row(
@@ -428,105 +381,6 @@ class HomeView extends StatelessWidget {
               },
         );
       },
-    );
-  }
-}
-
-// ==========================================
-// NEW WIDGET: SMART AI INPUT CARD
-// ==========================================
-class _SmartInputCard extends StatefulWidget {
-  const _SmartInputCard();
-
-  @override
-  State<_SmartInputCard> createState() => _SmartInputCardState();
-}
-
-class _SmartInputCardState extends State<_SmartInputCard> {
-  final TextEditingController _controller = TextEditingController();
-  final AiExpenseService _aiService = AiExpenseService();
-  bool _isLoading = false;
-
-  Future<void> _submit() async {
-    final text = _controller.text.trim();
-    if (text.isEmpty) return;
-
-    setState(() => _isLoading = true);
-
-    try {
-      await _aiService.logExpenseFromText(text);
-      _controller.clear();
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('✨ Expense logged magically!')),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Error: ${e.toString().replaceAll('Exception: ', '')}',
-            ),
-          ),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final onSurface = Theme.of(context).colorScheme.onSurface;
-
-    return GlassCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Smart Log ✨',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.w800,
-              color: onSurface,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'Just type what you spent or earned.',
-            style: Theme.of(
-              context,
-            ).textTheme.bodySmall?.copyWith(color: onSurface.withOpacity(0.68)),
-          ),
-          const SizedBox(height: 14),
-          TextField(
-            controller: _controller,
-            enabled: !_isLoading,
-            textInputAction: TextInputAction.send,
-            onSubmitted: (_) => _submit(),
-            decoration: InputDecoration(
-              hintText: 'e.g., "Spent \$15 on Uber"',
-              suffixIcon: _isLoading
-                  ? const Padding(
-                      padding: EdgeInsets.all(14.0),
-                      child: CircularProgressIndicator(strokeWidth: 2.5),
-                    )
-                  : IconButton(
-                      icon: const Icon(Icons.auto_awesome_rounded),
-                      color: Theme.of(context).colorScheme.primary,
-                      onPressed: _submit,
-                    ),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
@@ -694,11 +548,8 @@ class _TransactionRow extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              // Changed to show aiCategory if manual category is empty
               Text(
-                transaction.category.isNotEmpty
-                    ? transaction.category
-                    : transaction.aiCategory,
+                transaction.category,
                 style: Theme.of(context).textTheme.titleSmall?.copyWith(
                   fontWeight: FontWeight.w700,
                   color: onSurface,
