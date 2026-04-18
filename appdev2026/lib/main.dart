@@ -55,30 +55,36 @@ class MyApp extends StatelessWidget {
 
 ThemeData _buildTheme(Brightness brightness) {
   final bool isDark = brightness == Brightness.dark;
+
+  // Clean Black and White surfaces
   final Color surface = isDark
-      ? const Color(0xFF160C26)
+      ? const Color(0xFF121212)
       : const Color(0xFFFFFFFF);
   final Color onSurface = isDark
-      ? const Color(0xFFF6EEFF)
-      : const Color(0xFF140A24);
-  final Color primary = isDark ? Colors.purpleAccent : const Color(0xFF6E3BFF);
-  final Color secondary = isDark
-      ? Colors.deepPurpleAccent
-      : const Color(0xFF8D5CFF);
+      ? const Color(0xFFFFFFFF)
+      : const Color(0xFF000000);
 
-  final Color appBarBackground = surface.withOpacity(isDark ? 0.58 : 0.78);
-  final Color cardBackground = surface.withOpacity(isDark ? 0.16 : 0.88);
+  // Blue accents
+  final Color primary = isDark
+      ? const Color(0xFF64B5F6)
+      : const Color(0xFF1976D2);
+  final Color secondary = isDark
+      ? const Color(0xFF42A5F5)
+      : const Color(0xFF1565C0);
+
+  final Color appBarBackground = surface.withOpacity(isDark ? 0.90 : 0.95);
+  final Color cardBackground = surface.withOpacity(isDark ? 0.40 : 0.95);
   final Color fieldBackground = isDark
       ? Colors.white.withOpacity(0.08)
-      : const Color(0xFFF0EAFE);
-  final Color navBackground = surface.withOpacity(isDark ? 0.62 : 0.92);
+      : const Color(0xFFF0F4F8);
+  final Color navBackground = surface.withOpacity(isDark ? 0.90 : 0.95);
 
   final ColorScheme colorScheme = ColorScheme(
     brightness: brightness,
     primary: primary,
-    onPrimary: isDark ? const Color(0xFF18051E) : Colors.white,
+    onPrimary: Colors.white,
     secondary: secondary,
-    onSecondary: isDark ? const Color(0xFF140A24) : Colors.white,
+    onSecondary: Colors.white,
     error: const Color(0xFFFF6B93),
     onError: Colors.white,
     surface: surface,
@@ -87,11 +93,11 @@ ThemeData _buildTheme(Brightness brightness) {
     onSurfaceVariant: onSurface.withOpacity(0.74),
     outline: primary.withOpacity(0.35),
     shadow: Colors.black,
-    inverseSurface: isDark ? const Color(0xFFF8F3FF) : const Color(0xFF1A1028),
+    inverseSurface: isDark ? const Color(0xFFFFFFFF) : const Color(0xFF121212),
     onInverseSurface: isDark
-        ? const Color(0xFF1A1028)
-        : const Color(0xFFF8F3FF),
-    tertiary: const Color(0xFF00E5FF),
+        ? const Color(0xFF121212)
+        : const Color(0xFFFFFFFF),
+    tertiary: const Color(0xFF00B0FF),
     onTertiary: Colors.black,
   );
 
@@ -151,7 +157,7 @@ ThemeData _buildTheme(Brightness brightness) {
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
         backgroundColor: primary,
-        foregroundColor: isDark ? const Color(0xFF0C0512) : Colors.white,
+        foregroundColor: Colors.white,
         minimumSize: const Size.fromHeight(56),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
         elevation: 0,

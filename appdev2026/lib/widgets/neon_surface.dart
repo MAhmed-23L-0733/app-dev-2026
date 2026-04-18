@@ -19,8 +19,16 @@ class NeonBackground extends StatelessWidget {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: isDark
-              ? const [Color(0xFF090512), Color(0xFF130A22), Color(0xFF070411)]
-              : const [Color(0xFFF9F5FF), Color(0xFFF3ECFF), Color(0xFFEFE6FF)],
+              ? const [
+                  Color(0xFF000000),
+                  Color(0xFF071324),
+                  Color(0xFF000000),
+                ] // Black / Dark Blue
+              : const [
+                  Color(0xFFFFFFFF),
+                  Color(0xFFF0F6FF),
+                  Color(0xFFFFFFFF),
+                ], // White / Light Blue
         ),
       ),
       child: Stack(
@@ -29,7 +37,7 @@ class NeonBackground extends StatelessWidget {
             top: -50,
             right: -30,
             child: _GlowCircle(
-              color: Colors.purpleAccent.withOpacity(isDark ? 0.32 : 0.16),
+              color: Colors.lightBlueAccent.withOpacity(isDark ? 0.15 : 0.12),
               size: 220,
             ),
           ),
@@ -37,7 +45,7 @@ class NeonBackground extends StatelessWidget {
             bottom: 60,
             left: -70,
             child: _GlowCircle(
-              color: Colors.deepPurpleAccent.withOpacity(isDark ? 0.24 : 0.14),
+              color: Colors.blueAccent.withOpacity(isDark ? 0.15 : 0.10),
               size: 260,
             ),
           ),
@@ -49,7 +57,7 @@ class NeonBackground extends StatelessWidget {
                     center: Alignment.topCenter,
                     radius: 1.3,
                     colors: [
-                      Colors.purpleAccent.withOpacity(isDark ? 0.10 : 0.05),
+                      Colors.blueAccent.withOpacity(isDark ? 0.08 : 0.04),
                       Colors.transparent,
                     ],
                   ),

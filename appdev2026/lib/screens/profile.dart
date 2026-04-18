@@ -35,7 +35,7 @@ class ProfileView extends StatelessWidget {
                     gradient: LinearGradient(
                       colors: <Color>[
                         Theme.of(context).colorScheme.primary,
-                        Colors.deepPurpleAccent,
+                        Colors.blueAccent,
                       ],
                     ),
                   ),
@@ -105,10 +105,6 @@ class ProfileView extends StatelessWidget {
                 const SizedBox(height: 14),
                 _SummaryRow(label: 'Authentication', value: provider),
                 const SizedBox(height: 12),
-                _SummaryRow(
-                  label: 'Email verified',
-                  value: user?.emailVerified == true ? 'Yes' : 'No',
-                ),
                 const SizedBox(height: 12),
                 _SummaryRow(label: 'Joined', value: joined),
                 const SizedBox(height: 12),
