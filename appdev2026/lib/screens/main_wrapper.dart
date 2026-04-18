@@ -33,6 +33,7 @@ class _MainWrapperScreenState extends State<MainWrapperScreen> {
       'Dashboard',
       'Add transaction',
       'Goals',
+      'Profile',
     ];
 
     return Scaffold(
@@ -41,15 +42,6 @@ class _MainWrapperScreenState extends State<MainWrapperScreen> {
       appBar: AppBar(
         title: Text(titles[_selectedIndex]),
         actions: <Widget>[
-          IconButton(
-            tooltip: 'Profile',
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute<void>(builder: (_) => const ProfileView()),
-              );
-            },
-            icon: const Icon(Icons.person_rounded),
-          ),
           IconButton(
             tooltip: 'Toggle theme',
             onPressed: appThemeController.toggleTheme,
@@ -70,6 +62,7 @@ class _MainWrapperScreenState extends State<MainWrapperScreen> {
               HomeView(),
               AddTransactionView(),
               GoalsView(),
+              ProfileView(),
             ],
           ),
         ),
@@ -96,6 +89,10 @@ class _MainWrapperScreenState extends State<MainWrapperScreen> {
                 BottomNavigationBarItem(
                   icon: Icon(Icons.flag_rounded),
                   label: 'Goals',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.person_rounded),
+                  label: 'Profile',
                 ),
               ],
             ),
