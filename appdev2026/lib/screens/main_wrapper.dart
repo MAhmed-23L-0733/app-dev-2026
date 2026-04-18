@@ -14,9 +14,10 @@ import '../widgets/logo.dart';
 import '../widgets/neon_surface.dart';
 
 class MainWrapperScreen extends StatefulWidget {
-  const MainWrapperScreen({super.key});
+  const MainWrapperScreen({super.key, this.initialIndex = 0});
 
   static const String routeName = '/main';
+  final int initialIndex;
 
   @override
   State<MainWrapperScreen> createState() => _MainWrapperScreenState();
@@ -28,7 +29,11 @@ class _MainWrapperScreenState extends State<MainWrapperScreen> {
   @override
   void initState() {
     super.initState();
-    _uiState = _MainWrapperUiState();
+    final int safeInitialIndex =
+        widget.initialIndex >= 0 && widget.initialIndex <= 3
+        ? widget.initialIndex
+        : 0;
+    _uiState = _MainWrapperUiState(initialIndex: safeInitialIndex);
     final User? user = FirebaseAuth.instance.currentUser;
     if (user != null) {
       UserProfileService.instance.loadPreferredCurrencyForUser(user);
@@ -144,7 +149,9 @@ class _MainWrapperScreenState extends State<MainWrapperScreen> {
 }
 
 class _MainWrapperUiState extends ChangeNotifier {
-  int selectedIndex = 0;
+  _MainWrapperUiState({int initialIndex = 0}) : selectedIndex = initialIndex;
+
+  int selectedIndex;
 
   void setSelectedIndex(int value) {
     if (selectedIndex == value) {

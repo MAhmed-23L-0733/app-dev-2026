@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import '../services/currency_service.dart';
 import '../services/ai_expense_service.dart';
 import '../services/budget_firestore_service.dart';
+import '../services/notification_service.dart';
 import '../widgets/neon_surface.dart';
 
 class AddTransactionView extends StatefulWidget {
@@ -70,6 +71,12 @@ class _AddTransactionViewState extends State<AddTransactionView> {
       if (!mounted) {
         return;
       }
+
+      await NotificationService.instance.showNotification(
+        title: 'Transaction Saved',
+        body: 'Your transaction was saved successfully.',
+        payload: NotificationService.payloadTransactions,
+      );
 
       _showMessage('Transaction saved successfully.', isSuccess: true);
     } catch (_) {
@@ -147,9 +154,11 @@ class _AddTransactionViewState extends State<AddTransactionView> {
         return;
       }
 
-      _showMessage(
-        'Receipt scanned successfully. Please review and save your transaction.',
-        isSuccess: true,
+      await NotificationService.instance.showNotification(
+        title: 'Receipt Ready',
+        body:
+            'Receipt details were extracted. Review and save this transaction.',
+        payload: NotificationService.payloadTransactions,
       );
     } catch (_) {
       _showMessage(

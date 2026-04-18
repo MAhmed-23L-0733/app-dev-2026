@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../models/goal.dart';
 import '../models/transaction.dart';
 import 'currency_service.dart';
+import 'notification_service.dart';
 
 class BudgetFirestoreService {
   const BudgetFirestoreService._();
@@ -230,6 +231,38 @@ class BudgetFirestoreService {
     });
   }
 
+  Future<void> deleteGoal({required User user, required String goalId}) async {
+    await _goals(user).doc(goalId).delete();
+  }
+
+  Future<void> updateGoalDeadline({
+    required User user,
+    required String goalId,
+    required DateTime deadline,
+  }) async {
+    final DateTime now = DateTime.now();
+    final DateTime today = DateTime(now.year, now.month, now.day);
+    final DateTime normalizedDeadline = DateTime(
+      deadline.year,
+      deadline.month,
+      deadline.day,
+    );
+
+    if (normalizedDeadline.isBefore(today)) {
+      throw FirebaseException(
+        plugin: 'cloud_firestore',
+        code: 'invalid-deadline',
+        message: 'Deadline cannot be older than today.',
+      );
+    }
+
+    await _goals(user).doc(goalId).update(<String, dynamic>{
+      'deadline': Timestamp.fromDate(normalizedDeadline),
+      'status': 'active',
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
   Future<double> getCurrentMonthNetTotal(User user) async {
     final DateTime now = DateTime.now();
     final DateTime startOfMonth = DateTime(now.year, now.month);
@@ -302,6 +335,8 @@ class BudgetFirestoreService {
     final DocumentReference<Map<String, dynamic>> summaryRef =
         _monthlySummaries(user).doc(monthKey);
     final double netTotal = await getCurrentMonthNetTotal(user);
+    bool hasReachedGoal = false;
+    String reachedGoalTitle = 'Savings goal';
 
     if (amountInBase > netTotal) {
       throw FirebaseException(
@@ -320,6 +355,7 @@ class BudgetFirestoreService {
       final Map<String, dynamic> goalData =
           goalSnapshot.data() ?? <String, dynamic>{};
       final String goalTitle = goalData['title'] as String? ?? 'Goal savings';
+      reachedGoalTitle = goalTitle;
 
       final double currentAmount = (goalData['currentAmount'] as num? ?? 0)
           .toDouble();
@@ -351,10 +387,12 @@ class BudgetFirestoreService {
         );
       }
 
+      hasReachedGoal = currentAmount + amountInBase >= targetAmount;
+
       transaction.update(goalRef, <String, dynamic>{
         'currentAmount': FieldValue.increment(amountInBase),
         'updatedAt': FieldValue.serverTimestamp(),
-        if (currentAmount + amountInBase >= targetAmount) 'status': 'completed',
+        if (hasReachedGoal) 'status': 'completed',
       });
 
       transaction.set(transactionRef, <String, dynamic>{
@@ -376,6 +414,14 @@ class BudgetFirestoreService {
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
     });
+
+    if (hasReachedGoal) {
+      await NotificationService.instance.showNotification(
+        title: 'Savings Goal Reached',
+        body: 'Congratulations! You reached "$reachedGoalTitle".',
+        payload: NotificationService.payloadGoals,
+      );
+    }
   }
 
   String _displayName(User user) {
