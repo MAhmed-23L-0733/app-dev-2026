@@ -3,9 +3,11 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'app_navigator.dart';
 import 'auth/signin.dart';
 import 'auth/signup.dart';
 import 'firebase_options.dart';
+import 'services/notification_service.dart';
 import 'screens/main_wrapper.dart';
 import 'screens/splash_screen.dart'; // Added splash screen import
 import 'screens/transactions.dart'; // Added transactions screen import
@@ -17,6 +19,7 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await dotenv.load(fileName: '.env');
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  await NotificationService.instance.init();
   runApp(const MyApp());
 }
 
@@ -29,6 +32,7 @@ class MyApp extends StatelessWidget {
       valueListenable: appThemeController,
       builder: (context, themeMode, _) {
         return MaterialApp(
+          navigatorKey: appNavigatorKey,
           debugShowCheckedModeBanner: false,
           title: 'Hackathon Firebase App',
           builder: (BuildContext context, Widget? child) {

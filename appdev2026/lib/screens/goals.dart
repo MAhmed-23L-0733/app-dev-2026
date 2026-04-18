@@ -174,6 +174,13 @@ class _GoalsViewState extends State<GoalsView> {
                             ) {
                               final List<GoalModel> goals =
                                   snapshot.data ?? <GoalModel>[];
+                              final List<GoalModel> activeGoals = goals
+                                  .where(
+                                    (GoalModel goal) =>
+                                        goal.currentAmount + 0.000001 <
+                                        goal.targetAmount,
+                                  )
+                                  .toList();
 
                               return SingleChildScrollView(
                                 padding: const EdgeInsets.fromLTRB(
@@ -471,9 +478,9 @@ class _GoalsViewState extends State<GoalsView> {
                                                     CircularProgressIndicator(),
                                               ),
                                             )
-                                          else if (goals.isEmpty)
+                                          else if (activeGoals.isEmpty)
                                             Text(
-                                              'No goals yet. Add one to start tracking progress.',
+                                              'No active goals right now. Add one to start tracking progress.',
                                               style: Theme.of(context)
                                                   .textTheme
                                                   .bodyMedium
@@ -484,7 +491,7 @@ class _GoalsViewState extends State<GoalsView> {
                                             )
                                           else
                                             Column(
-                                              children: goals
+                                              children: activeGoals
                                                   .map(
                                                     (GoalModel goal) => Padding(
                                                       padding:
@@ -566,6 +573,129 @@ class _GoalCard extends StatelessWidget {
   final double availableNetBase;
   final double availableNetDisplay;
   final String currencyCode;
+
+  Future<void> _deleteGoal(BuildContext context) async {
+    final bool shouldDelete =
+        await showDialog<bool>(
+          context: context,
+          builder: (BuildContext dialogContext) {
+            return AlertDialog(
+              title: const Text('Delete goal?'),
+              content: Text('"${goal.title}" will be removed permanently.'),
+              actions: <Widget>[
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(false),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(true),
+                  child: const Text('Delete'),
+                ),
+              ],
+            );
+          },
+        ) ??
+        false;
+
+    if (!shouldDelete) {
+      return;
+    }
+
+    final User? user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: Colors.red.shade700,
+            content: const Text('Please sign in again to continue.'),
+          ),
+        );
+      }
+      return;
+    }
+
+    try {
+      await BudgetFirestoreService.instance.deleteGoal(
+        user: user,
+        goalId: goal.id,
+      );
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: Colors.green.shade700,
+            content: const Text('Goal deleted successfully.'),
+          ),
+        );
+      }
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: Colors.red.shade700,
+            content: const Text('We could not delete your goal right now.'),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _updateDeadline(BuildContext context) async {
+    final DateTime today = _startOfDay(DateTime.now());
+    final DateTime initialDate =
+        _startOfDay(goal.deadline.toDate()).isBefore(today)
+        ? today
+        : _startOfDay(goal.deadline.toDate());
+
+    final DateTime? selected = await showDatePicker(
+      context: context,
+      initialDate: initialDate,
+      firstDate: today,
+      lastDate: DateTime(today.year + 10),
+      helpText: 'Update deadline',
+    );
+
+    if (selected == null) {
+      return;
+    }
+
+    final User? user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: Colors.red.shade700,
+            content: const Text('Please sign in again to continue.'),
+          ),
+        );
+      }
+      return;
+    }
+
+    try {
+      await BudgetFirestoreService.instance.updateGoalDeadline(
+        user: user,
+        goalId: goal.id,
+        deadline: selected,
+      );
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: Colors.green.shade700,
+            content: const Text('Deadline updated successfully.'),
+          ),
+        );
+      }
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: Colors.red.shade700,
+            content: const Text('We could not update deadline right now.'),
+          ),
+        );
+      }
+    }
+  }
 
   Future<void> _addSavings(BuildContext context) async {
     final GlobalKey<FormState> formKey = GlobalKey<FormState>();
@@ -720,6 +850,9 @@ class _GoalCard extends StatelessWidget {
     final double ratio = goal.targetAmount <= 0
         ? 0
         : (goal.currentAmount / goal.targetAmount).clamp(0.0, 1.0);
+    final DateTime today = _startOfDay(DateTime.now());
+    final DateTime goalDeadline = _startOfDay(goal.deadline.toDate());
+    final bool isOverdue = ratio < 1 && goalDeadline.isBefore(today);
     final double currentDisplayAmount = CurrencyPreferenceController.instance
         .fromBaseAmount(goal.currentAmount, currencyCode);
     final double targetDisplayAmount = CurrencyPreferenceController.instance
@@ -801,14 +934,48 @@ class _GoalCard extends StatelessWidget {
             ).textTheme.bodySmall?.copyWith(color: onSurface.withOpacity(0.6)),
           ),
           const SizedBox(height: 14),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: ratio >= 1 ? null : () => _addSavings(context),
-              icon: const Icon(Icons.savings_outlined),
-              label: const Text('Add savings'),
+          if (isOverdue)
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                Text(
+                  'This goal is overdue. Update the deadline or delete the goal to continue.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Colors.orange.shade800,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: <Widget>[
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () => _updateDeadline(context),
+                        icon: const Icon(Icons.event_repeat_rounded),
+                        label: const Text('Update deadline'),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () => _deleteGoal(context),
+                        icon: const Icon(Icons.delete_outline_rounded),
+                        label: const Text('Delete goal'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            )
+          else
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: ratio >= 1 ? null : () => _addSavings(context),
+                icon: const Icon(Icons.savings_outlined),
+                label: const Text('Add savings'),
+              ),
             ),
-          ),
         ],
       ),
     );
