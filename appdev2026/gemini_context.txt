@@ -44,10 +44,12 @@ dependencies:
   google_sign_in: ^6.3.0
   google_fonts: ^6.2.1
   google_generative_ai: ^0.4.7
+  http: ^1.2.2
   image_picker: ^1.1.2
   flutter_dotenv: ^5.2.1
   provider: ^6.1.5
-  flutter_local_notifications: ^17.1.2
+  flutter_local_notifications: ^21.0.0
+  flutter_svg: ^2.2.0
   
 
 dev_dependencies:
@@ -115,6 +117,16 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+
+
+
+========================================
+FILE PATH: lib\app_navigator.dart
+========================================
+import 'package:flutter/material.dart';
+
+final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
 
 
 
@@ -240,6 +252,7 @@ FILE PATH: lib\main.dart
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'app_navigator.dart';
 import 'auth/signin.dart';
 import 'auth/signup.dart';
 import 'firebase_options.dart';
@@ -268,6 +281,7 @@ class MyApp extends StatelessWidget {
       valueListenable: appThemeController,
       builder: (context, themeMode, _) {
         return MaterialApp(
+          navigatorKey: appNavigatorKey,
           debugShowCheckedModeBanner: false,
           title: 'Hackathon Firebase App',
           builder: (BuildContext context, Widget? child) {
@@ -576,6 +590,7 @@ import 'google_auth_service.dart';
 import 'user_profile_service.dart';
 import '../screens/main_wrapper.dart';
 import '../theme_controller.dart';
+import '../widgets/google_sign_in_button.dart';
 import '../widgets/neon_surface.dart';
 import 'signup.dart';
 
@@ -825,30 +840,11 @@ class _SignInScreenState extends State<SignInScreen> {
                                   : const Text('Sign In'),
                             ),
                             const SizedBox(height: 14),
-                            OutlinedButton(
+                            GoogleSignInButton(
                               onPressed: uiState.isLoading
                                   ? null
                                   : _continueWithGoogle,
-                              style: OutlinedButton.styleFrom(
-                                minimumSize: const Size.fromHeight(56),
-                                side: BorderSide(
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.primary.withOpacity(0.35),
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(18),
-                                ),
-                              ),
-                              child: const Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                mainAxisSize: MainAxisSize.min,
-                                children: <Widget>[
-                                  _GoogleGlyph(),
-                                  SizedBox(width: 12),
-                                  Text('Continue with Google'),
-                                ],
-                              ),
+                              label: 'Continue with Google',
                             ),
                             const SizedBox(height: 10),
                             TextButton(
@@ -906,44 +902,6 @@ class _SignInUiState extends ChangeNotifier {
   }
 }
 
-class _GoogleGlyph extends StatelessWidget {
-  const _GoogleGlyph();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 28,
-      height: 28,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: Theme.of(context).colorScheme.surface.withOpacity(0.95),
-        border: Border.all(color: Colors.white.withOpacity(0.22)),
-      ),
-      alignment: Alignment.center,
-      child: ShaderMask(
-        shaderCallback: (Rect bounds) {
-          return const LinearGradient(
-            colors: <Color>[
-              Color(0xFF4285F4),
-              Color(0xFFEA4335),
-              Color(0xFFFABB05),
-              Color(0xFF34A853),
-            ],
-          ).createShader(bounds);
-        },
-        child: const Text(
-          'G',
-          style: TextStyle(
-            fontWeight: FontWeight.w900,
-            fontSize: 18,
-            color: Colors.white,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 
 
 
@@ -960,6 +918,7 @@ import 'google_auth_service.dart';
 import 'user_profile_service.dart';
 import '../screens/main_wrapper.dart';
 import '../theme_controller.dart';
+import '../widgets/google_sign_in_button.dart';
 import '../widgets/neon_surface.dart';
 
 class SignUpScreen extends StatefulWidget {
@@ -1264,30 +1223,11 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                   : const Text('Sign Up'),
                             ),
                             const SizedBox(height: 14),
-                            OutlinedButton(
+                            GoogleSignInButton(
                               onPressed: uiState.isLoading
                                   ? null
                                   : _continueWithGoogle,
-                              style: OutlinedButton.styleFrom(
-                                minimumSize: const Size.fromHeight(56),
-                                side: BorderSide(
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.primary.withOpacity(0.35),
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(18),
-                                ),
-                              ),
-                              child: const Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                mainAxisSize: MainAxisSize.min,
-                                children: <Widget>[
-                                  _GoogleGlyph(),
-                                  SizedBox(width: 12),
-                                  Text('Continue with Google'),
-                                ],
-                              ),
+                              label: 'Continue with Google',
                             ),
                             const SizedBox(height: 10),
                             TextButton(
@@ -1343,44 +1283,6 @@ class _SignUpUiState extends ChangeNotifier {
     passwordController.dispose();
     confirmPasswordController.dispose();
     super.dispose();
-  }
-}
-
-class _GoogleGlyph extends StatelessWidget {
-  const _GoogleGlyph();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 28,
-      height: 28,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: Theme.of(context).colorScheme.surface.withOpacity(0.95),
-        border: Border.all(color: Colors.white.withOpacity(0.22)),
-      ),
-      alignment: Alignment.center,
-      child: ShaderMask(
-        shaderCallback: (Rect bounds) {
-          return const LinearGradient(
-            colors: <Color>[
-              Color(0xFF4285F4),
-              Color(0xFFEA4335),
-              Color(0xFFFABB05),
-              Color(0xFF34A853),
-            ],
-          ).createShader(bounds);
-        },
-        child: const Text(
-          'G',
-          style: TextStyle(
-            fontWeight: FontWeight.w900,
-            fontSize: 18,
-            color: Colors.white,
-          ),
-        ),
-      ),
-    );
   }
 }
 
@@ -1867,6 +1769,12 @@ class _AddTransactionViewState extends State<AddTransactionView> {
         return;
       }
 
+      await NotificationService.instance.showNotification(
+        title: 'Transaction Saved',
+        body: 'Your transaction was saved successfully.',
+        payload: NotificationService.payloadTransactions,
+      );
+
       _showMessage('Transaction saved successfully.', isSuccess: true);
     } catch (_) {
       _showMessage(
@@ -1947,6 +1855,7 @@ class _AddTransactionViewState extends State<AddTransactionView> {
         title: 'Receipt Ready',
         body:
             'Receipt details were extracted. Review and save this transaction.',
+        payload: NotificationService.payloadTransactions,
       );
     } catch (_) {
       _showMessage(
@@ -2223,6 +2132,8 @@ class _AddTransactionUiState extends ChangeNotifier {
 ========================================
 FILE PATH: lib\screens\chat_view.dart
 ========================================
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import '../services/ai_chat_service.dart';
 import '../widgets/neon_surface.dart';
@@ -2245,6 +2156,7 @@ class _ChatViewState extends State<ChatView> {
   final TextEditingController _controller = TextEditingController();
   final List<ChatMessage> _messages = [];
   bool _isLoading = false;
+  DateTime? _lastSubmitAt;
 
   @override
   void initState() {
@@ -2255,11 +2167,26 @@ class _ChatViewState extends State<ChatView> {
         false,
       ),
     );
+
+    unawaited(_chatService.initializeChat());
+    unawaited(_chatService.testConnection());
   }
 
   Future<void> _sendMessage() async {
+    if (_isLoading) {
+      return;
+    }
+
+    final DateTime now = DateTime.now();
+    if (_lastSubmitAt != null &&
+        now.difference(_lastSubmitAt!).inMilliseconds < 500) {
+      return;
+    }
+
     final text = _controller.text.trim();
     if (text.isEmpty) return;
+
+    _lastSubmitAt = now;
 
     setState(() {
       _messages.add(ChatMessage(text, true));
@@ -2575,6 +2502,13 @@ class _GoalsViewState extends State<GoalsView> {
                             ) {
                               final List<GoalModel> goals =
                                   snapshot.data ?? <GoalModel>[];
+                              final List<GoalModel> activeGoals = goals
+                                  .where(
+                                    (GoalModel goal) =>
+                                        goal.currentAmount + 0.000001 <
+                                        goal.targetAmount,
+                                  )
+                                  .toList();
 
                               return SingleChildScrollView(
                                 padding: const EdgeInsets.fromLTRB(
@@ -2872,9 +2806,9 @@ class _GoalsViewState extends State<GoalsView> {
                                                     CircularProgressIndicator(),
                                               ),
                                             )
-                                          else if (goals.isEmpty)
+                                          else if (activeGoals.isEmpty)
                                             Text(
-                                              'No goals yet. Add one to start tracking progress.',
+                                              'No active goals right now. Add one to start tracking progress.',
                                               style: Theme.of(context)
                                                   .textTheme
                                                   .bodyMedium
@@ -2885,7 +2819,7 @@ class _GoalsViewState extends State<GoalsView> {
                                             )
                                           else
                                             Column(
-                                              children: goals
+                                              children: activeGoals
                                                   .map(
                                                     (GoalModel goal) => Padding(
                                                       padding:
@@ -2967,6 +2901,129 @@ class _GoalCard extends StatelessWidget {
   final double availableNetBase;
   final double availableNetDisplay;
   final String currencyCode;
+
+  Future<void> _deleteGoal(BuildContext context) async {
+    final bool shouldDelete =
+        await showDialog<bool>(
+          context: context,
+          builder: (BuildContext dialogContext) {
+            return AlertDialog(
+              title: const Text('Delete goal?'),
+              content: Text('"${goal.title}" will be removed permanently.'),
+              actions: <Widget>[
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(false),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(true),
+                  child: const Text('Delete'),
+                ),
+              ],
+            );
+          },
+        ) ??
+        false;
+
+    if (!shouldDelete) {
+      return;
+    }
+
+    final User? user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: Colors.red.shade700,
+            content: const Text('Please sign in again to continue.'),
+          ),
+        );
+      }
+      return;
+    }
+
+    try {
+      await BudgetFirestoreService.instance.deleteGoal(
+        user: user,
+        goalId: goal.id,
+      );
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: Colors.green.shade700,
+            content: const Text('Goal deleted successfully.'),
+          ),
+        );
+      }
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: Colors.red.shade700,
+            content: const Text('We could not delete your goal right now.'),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _updateDeadline(BuildContext context) async {
+    final DateTime today = _startOfDay(DateTime.now());
+    final DateTime initialDate =
+        _startOfDay(goal.deadline.toDate()).isBefore(today)
+        ? today
+        : _startOfDay(goal.deadline.toDate());
+
+    final DateTime? selected = await showDatePicker(
+      context: context,
+      initialDate: initialDate,
+      firstDate: today,
+      lastDate: DateTime(today.year + 10),
+      helpText: 'Update deadline',
+    );
+
+    if (selected == null) {
+      return;
+    }
+
+    final User? user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: Colors.red.shade700,
+            content: const Text('Please sign in again to continue.'),
+          ),
+        );
+      }
+      return;
+    }
+
+    try {
+      await BudgetFirestoreService.instance.updateGoalDeadline(
+        user: user,
+        goalId: goal.id,
+        deadline: selected,
+      );
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: Colors.green.shade700,
+            content: const Text('Deadline updated successfully.'),
+          ),
+        );
+      }
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: Colors.red.shade700,
+            content: const Text('We could not update deadline right now.'),
+          ),
+        );
+      }
+    }
+  }
 
   Future<void> _addSavings(BuildContext context) async {
     final GlobalKey<FormState> formKey = GlobalKey<FormState>();
@@ -3121,6 +3178,9 @@ class _GoalCard extends StatelessWidget {
     final double ratio = goal.targetAmount <= 0
         ? 0
         : (goal.currentAmount / goal.targetAmount).clamp(0.0, 1.0);
+    final DateTime today = _startOfDay(DateTime.now());
+    final DateTime goalDeadline = _startOfDay(goal.deadline.toDate());
+    final bool isOverdue = ratio < 1 && goalDeadline.isBefore(today);
     final double currentDisplayAmount = CurrencyPreferenceController.instance
         .fromBaseAmount(goal.currentAmount, currencyCode);
     final double targetDisplayAmount = CurrencyPreferenceController.instance
@@ -3202,14 +3262,48 @@ class _GoalCard extends StatelessWidget {
             ).textTheme.bodySmall?.copyWith(color: onSurface.withOpacity(0.6)),
           ),
           const SizedBox(height: 14),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: ratio >= 1 ? null : () => _addSavings(context),
-              icon: const Icon(Icons.savings_outlined),
-              label: const Text('Add savings'),
+          if (isOverdue)
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                Text(
+                  'This goal is overdue. Update the deadline or delete the goal to continue.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Colors.orange.shade800,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: <Widget>[
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () => _updateDeadline(context),
+                        icon: const Icon(Icons.event_repeat_rounded),
+                        label: const Text('Update deadline'),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () => _deleteGoal(context),
+                        icon: const Icon(Icons.delete_outline_rounded),
+                        label: const Text('Delete goal'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            )
+          else
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: ratio >= 1 ? null : () => _addSavings(context),
+                icon: const Icon(Icons.savings_outlined),
+                label: const Text('Add savings'),
+              ),
             ),
-          ),
         ],
       ),
     );
@@ -3344,16 +3438,9 @@ class HomeView extends StatelessWidget {
                               (double total, TransactionModel transaction) =>
                                   total + transaction.amount,
                             );
-                        final bool shouldUseDerivedTotals =
-                            transactions.isNotEmpty &&
-                            summary.incomeTotal == 0 &&
-                            summary.expenseTotal == 0;
-                        final double incomeTotal = shouldUseDerivedTotals
-                            ? derivedIncomeTotal
-                            : summary.incomeTotal;
-                        final double expenseTotal = shouldUseDerivedTotals
-                            ? derivedExpenseTotal
-                            : summary.expenseTotal;
+                        // Always trust transaction stream totals for UI consistency.
+                        final double incomeTotal = derivedIncomeTotal;
+                        final double expenseTotal = derivedExpenseTotal;
                         final double balanceBase = incomeTotal - expenseTotal;
 
                         return SingleChildScrollView(
@@ -4147,9 +4234,10 @@ import '../widgets/logo.dart';
 import '../widgets/neon_surface.dart';
 
 class MainWrapperScreen extends StatefulWidget {
-  const MainWrapperScreen({super.key});
+  const MainWrapperScreen({super.key, this.initialIndex = 0});
 
   static const String routeName = '/main';
+  final int initialIndex;
 
   @override
   State<MainWrapperScreen> createState() => _MainWrapperScreenState();
@@ -4161,7 +4249,11 @@ class _MainWrapperScreenState extends State<MainWrapperScreen> {
   @override
   void initState() {
     super.initState();
-    _uiState = _MainWrapperUiState();
+    final int safeInitialIndex =
+        widget.initialIndex >= 0 && widget.initialIndex <= 3
+        ? widget.initialIndex
+        : 0;
+    _uiState = _MainWrapperUiState(initialIndex: safeInitialIndex);
     final User? user = FirebaseAuth.instance.currentUser;
     if (user != null) {
       UserProfileService.instance.loadPreferredCurrencyForUser(user);
@@ -4261,12 +4353,20 @@ class _MainWrapperScreenState extends State<MainWrapperScreen> {
                 ),
               ),
             ),
-            floatingActionButton: FloatingActionButton(
-              onPressed: () => Navigator.pushNamed(context, '/chat'),
-              backgroundColor: const Color(0xFF1565C0),
-              tooltip: 'AI Chat',
-              child: const Icon(Icons.smart_toy_rounded, color: Colors.white),
-            ),
+            floatingActionButton: uiState.selectedIndex == 0
+                ? Padding(
+                    padding: const EdgeInsets.only(bottom: 40, right: 10),
+                    child: FloatingActionButton(
+                      onPressed: () => Navigator.pushNamed(context, '/chat'),
+                      backgroundColor: const Color(0xFF1565C0),
+                      tooltip: 'AI Chat',
+                      child: const Icon(
+                        Icons.smart_toy_rounded,
+                        color: Colors.white,
+                      ),
+                    ),
+                  )
+                : null,
             floatingActionButtonLocation:
                 FloatingActionButtonLocation.endDocked,
           );
@@ -4277,7 +4377,9 @@ class _MainWrapperScreenState extends State<MainWrapperScreen> {
 }
 
 class _MainWrapperUiState extends ChangeNotifier {
-  int selectedIndex = 0;
+  _MainWrapperUiState({int initialIndex = 0}) : selectedIndex = initialIndex;
+
+  int selectedIndex;
 
   void setSelectedIndex(int value) {
     if (selectedIndex == value) {
@@ -5372,57 +5474,152 @@ class _TransactionCard extends StatelessWidget {
 ========================================
 FILE PATH: lib\services\ai_chat_service.dart
 ========================================
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:convert';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:google_generative_ai/google_generative_ai.dart';
+import 'package:http/http.dart' as http;
 
 import '../models/transaction.dart';
 import 'budget_firestore_service.dart';
 import '../controllers/currency_controllers.dart'; // To get the right currency symbol!
 
 class AiChatService {
-  String get _apiKey {
-    final String? key = dotenv.env['GEMINI_API_KEY'];
+  static bool _isSendingMessage = false;
+  Future<void>? _initializeChatFuture;
+  static const String _openRouterUrl =
+      'https://openrouter.ai/api/v1/chat/completions';
+  static const List<String> _fallbackModels = [
+    'openrouter/free',
+    'nvidia/nemotron-super-49b-v1:free',
+    'google/gemma-3-27b-it:free',
+    'google/gemma-3-12b-it:free',
+    'meta-llama/llama-3.3-70b-instruct:free',
+  ];
+  static const int _maxConversationMessages = 20;
+
+  static const Set<String> _spendingStopWords = <String>{
+    'a',
+    'about',
+    'all',
+    'am',
+    'an',
+    'and',
+    'can',
+    'cost',
+    'current',
+    'did',
+    'do',
+    'does',
+    'expense',
+    'expenses',
+    'for',
+    'have',
+    'how',
+    'i',
+    'in',
+    'is',
+    'it',
+    'month',
+    'much',
+    'my',
+    'now',
+    'of',
+    'on',
+    'paid',
+    'pay',
+    'right',
+    'show',
+    'so',
+    'spend',
+    'spending',
+    'spent',
+    'tell',
+    'that',
+    'the',
+    'this',
+    'til',
+    'to',
+    'today',
+    'total',
+    'until',
+    'up',
+    'what',
+  };
+
+  String get _openRouterApiKey {
+    final String? key = dotenv.env['OPENROUTER_API_KEY'];
     if (key == null || key.isEmpty) {
-      throw Exception('Missing GEMINI_API_KEY in .env');
+      throw Exception('Missing OPENROUTER_API_KEY in .env');
     }
     return key;
   }
 
-  ChatSession? _chatSession;
+  String get _openRouterModel {
+    final String? model = dotenv.env['OPENROUTER_MODEL'];
+    if (model == null || model.trim().isEmpty) {
+      return 'deepseek/deepseek-v3:free';
+    }
+
+    return model.trim();
+  }
+
+  String? _systemInstruction;
+  final List<Map<String, String>> _conversation = <Map<String, String>>[];
   List<TransactionModel> _allTransactions = <TransactionModel>[];
 
   // 1. Initialize the chat with the user's live financial context
   Future<void> initializeChat({bool forceRefresh = false}) async {
-    if (!forceRefresh && _chatSession != null) {
+    if (!forceRefresh && _systemInstruction != null) {
       return;
     }
 
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) throw Exception('User not signed in');
+    if (!forceRefresh && _initializeChatFuture != null) {
+      return _initializeChatFuture!;
+    }
+
+    if (forceRefresh) {
+      _initializeChatFuture = null;
+    }
+
+    late final Future<void> initialization;
+    initialization = _initializeChat().catchError((Object error) {
+      if (!forceRefresh) {
+        _initializeChatFuture = null;
+      }
+      throw error;
+    });
+    if (!forceRefresh) {
+      _initializeChatFuture = initialization;
+    }
+
+    return initialization;
+  }
+
+  Future<void> _initializeChat() async {
+    await _refreshTransactionCache();
 
     final DateTime now = DateTime.now();
 
-    // Load full transaction history for the current logged-in user.
-    _allTransactions = await BudgetFirestoreService.instance
-        .watchAllTransactions(user)
-        .first;
+    final String activeCurrencyCode =
+        CurrencyPreferenceController.instance.currentCode;
+    final String symbol =
+        CurrencyPreferenceController.instance.currentOption.symbol;
 
-    final double totalIncomeAllTime = _allTransactions
+    final double totalIncomeAllTimeBase = _allTransactions
         .where((TransactionModel tx) => tx.type == 'income')
         .fold<double>(
           0,
           (double total, TransactionModel tx) => total + tx.amount,
         );
-    final double totalExpenseAllTime = _allTransactions
+    final double totalExpenseAllTimeBase = _allTransactions
         .where((TransactionModel tx) => tx.type != 'income')
         .fold<double>(
           0,
           (double total, TransactionModel tx) => total + tx.amount,
         );
 
-    final double incomeThisMonth = _allTransactions
+    final double incomeThisMonthBase = _allTransactions
         .where(
           (TransactionModel tx) =>
               tx.type == 'income' &&
@@ -5433,7 +5630,7 @@ class AiChatService {
           0,
           (double total, TransactionModel tx) => total + tx.amount,
         );
-    final double expenseThisMonth = _allTransactions
+    final double expenseThisMonthBase = _allTransactions
         .where(
           (TransactionModel tx) =>
               tx.type != 'income' &&
@@ -5444,6 +5641,14 @@ class AiChatService {
           0,
           (double total, TransactionModel tx) => total + tx.amount,
         );
+    final double totalIncomeAllTime = CurrencyPreferenceController.instance
+        .fromBaseAmount(totalIncomeAllTimeBase, activeCurrencyCode);
+    final double totalExpenseAllTime = CurrencyPreferenceController.instance
+        .fromBaseAmount(totalExpenseAllTimeBase, activeCurrencyCode);
+    final double incomeThisMonth = CurrencyPreferenceController.instance
+        .fromBaseAmount(incomeThisMonthBase, activeCurrencyCode);
+    final double expenseThisMonth = CurrencyPreferenceController.instance
+        .fromBaseAmount(expenseThisMonthBase, activeCurrencyCode);
     final double netThisMonth = incomeThisMonth - expenseThisMonth;
 
     final List<TransactionModel> recentTransactions = _allTransactions
@@ -5457,20 +5662,18 @@ class AiChatService {
                     ? 'General'
                     : tx.aiCategory.trim())
               : tx.category.trim();
-          return '- ${date.toIso8601String().split('T').first} | ${tx.type} | ${tx.amount.toStringAsFixed(2)} | $category | ${tx.note.trim()}';
+          final double convertedAmount = CurrencyPreferenceController.instance
+              .fromBaseAmount(tx.amount, activeCurrencyCode);
+          return '- ${date.toIso8601String().split('T').first} | ${tx.type} | $symbol${convertedAmount.toStringAsFixed(2)} | $category | ${tx.note.trim()}';
         })
         .join('\n');
-
-    // Get the user's active currency symbol (e.g., Rs, $, €)
-    final String symbol =
-        CurrencyPreferenceController.instance.currentOption.symbol;
 
     // Inject the live data into the AI's brain
     final String systemInstruction =
         '''
       You are a witty, highly intelligent, and slightly sassy financial advisor. 
       You must answer using this user's REAL transaction history below.
-      The amounts are already normalized to one base currency.
+      All listed amounts are already converted to the user's currently selected currency: $activeCurrencyCode.
 
       Key totals:
       - All-time Income: $symbol${totalIncomeAllTime.toStringAsFixed(2)}
@@ -5488,44 +5691,163 @@ class AiChatService {
       If they want to buy something they can't afford, playfully roast them. Do not use markdown tables.
     ''';
 
-    final model = GenerativeModel(
-      model: 'gemini-2.5-flash',
-      apiKey: _apiKey,
-      systemInstruction: Content.system(systemInstruction),
-    );
-
-    // Start the session (this keeps history in-memory automatically!)
-    _chatSession = model.startChat();
+    _systemInstruction = systemInstruction;
+    _conversation
+      ..clear()
+      ..add(<String, String>{'role': 'system', 'content': systemInstruction});
   }
 
   // 2. Send a message to Gemini and return the string
   Future<String> sendMessage(String message) async {
-    await initializeChat(forceRefresh: true);
-
-    final String? deterministicAnswer = _buildDeterministicSpendAnswer(message);
-    if (deterministicAnswer != null) {
-      return deterministicAnswer;
+    if (_isSendingMessage) {
+      return 'Hold up, I’m still answering the last question.';
     }
 
+    _isSendingMessage = true;
+
     try {
-      final response = await _chatSession!.sendMessage(Content.text(message));
-      return response.text ?? 'I have no words.';
+      await initializeChat();
+      await _refreshTransactionCache();
+
+      final String? deterministicAnswer = _buildDeterministicSpendAnswer(
+        message,
+      );
+      if (deterministicAnswer != null) {
+        _appendConversation('user', message);
+        _appendConversation('assistant', deterministicAnswer);
+        return deterministicAnswer;
+      }
+
+      final List<Map<String, String>> requestMessages = <Map<String, String>>[
+        ..._conversation,
+        <String, String>{'role': 'user', 'content': message},
+      ];
+
+      final String assistantText = await _callOpenRouter(requestMessages);
+
+      _appendConversation('user', message);
+      _appendConversation('assistant', assistantText);
+      return assistantText;
     } catch (e) {
       print('🔥 Chat Error: $e');
       return 'Sorry, my brain is taking a break right now. Try again in a second!';
+    } finally {
+      _isSendingMessage = false;
     }
+  }
+
+  // Temporary diagnostic helper to verify OpenRouter connectivity.
+  Future<void> testConnection() async {
+    print('🧪 Testing OpenRouter connection...');
+    final String key = _openRouterApiKey;
+    final int previewLength = key.length < 15 ? key.length : 15;
+    print('🔑 Key: ${key.substring(0, previewLength)}...');
+    print('🤖 Model: $_openRouterModel');
+
+    try {
+      final http.Response response = await http.post(
+        Uri.parse(_openRouterUrl),
+        headers: <String, String>{
+          'Authorization': 'Bearer $_openRouterApiKey',
+          'Content-Type': 'application/json',
+          'HTTP-Referer': 'https://localhost',
+          'X-Title': 'ExpenseTracker',
+        },
+        body: jsonEncode(<String, dynamic>{
+          'model': 'openrouter/free',
+          'messages': <Map<String, String>>[
+            <String, String>{'role': 'user', 'content': 'Say hi in one word.'},
+          ],
+        }),
+      );
+
+      print('📡 Status: ${response.statusCode}');
+      print('📦 Body: ${response.body}');
+    } catch (e) {
+      print('❌ Error: $e');
+    }
+  }
+
+  Future<String> _callOpenRouter(
+    List<Map<String, String>> requestMessages,
+  ) async {
+    final List<String> modelsToTry = <String>[
+      _openRouterModel,
+      ..._fallbackModels.where((String model) => model != _openRouterModel),
+    ];
+
+    for (final String model in modelsToTry) {
+      try {
+        final http.Response response = await http.post(
+          Uri.parse(_openRouterUrl),
+          headers: <String, String>{
+            'Authorization': 'Bearer $_openRouterApiKey',
+            'Content-Type': 'application/json',
+            'HTTP-Referer': 'https://localhost',
+            'X-Title': 'ExpenseTracker',
+          },
+          body: jsonEncode(<String, dynamic>{
+            'model': model,
+            'messages': requestMessages,
+            'temperature': 0.7,
+          }),
+        );
+
+        if (response.statusCode == 503 || response.statusCode == 429) {
+          print(
+            'WARN: Model $model failed (${response.statusCode}), trying next...',
+          );
+          continue;
+        }
+
+        if (response.statusCode < 200 || response.statusCode >= 300) {
+          throw Exception(
+            'OpenRouter error ${response.statusCode}: ${response.body}',
+          );
+        }
+
+        final Map<String, dynamic> decoded =
+            jsonDecode(response.body) as Map<String, dynamic>;
+        final List<dynamic> choices =
+            (decoded['choices'] as List<dynamic>? ?? <dynamic>[]);
+
+        if (choices.isEmpty) {
+          continue;
+        }
+
+        final Map<String, dynamic> firstChoice =
+            choices.first as Map<String, dynamic>;
+        final Map<String, dynamic> assistantMessage =
+            firstChoice['message'] as Map<String, dynamic>? ??
+            <String, dynamic>{};
+
+        final String text = _extractAssistantText(assistantMessage['content']);
+        if (text.trim().isEmpty) {
+          continue;
+        }
+
+        print('INFO: Got response from model: $model');
+        return text;
+      } catch (e) {
+        print('WARN: Model $model threw: $e');
+        continue;
+      }
+    }
+
+    throw Exception('All models failed or returned empty responses.');
   }
 
   String? _buildDeterministicSpendAnswer(String question) {
     final String input = question.toLowerCase();
 
     final bool asksSpending =
-        input.contains('how much') &&
-        (input.contains('spend') ||
-            input.contains('spent') ||
-            input.contains('expense') ||
-            input.contains('pay') ||
-            input.contains('paid'));
+        input.contains('how much') ||
+        input.contains('spent') ||
+        input.contains('spend') ||
+        input.contains('expense') ||
+        input.contains('expenses') ||
+        input.contains('cost') ||
+        input.contains('total');
 
     if (!asksSpending) {
       return null;
@@ -5533,6 +5855,8 @@ class AiChatService {
 
     final bool thisMonth =
         input.contains('this month') || input.contains('current month');
+
+    final String? topic = _extractSpendingTopic(input);
 
     final DateTime now = DateTime.now();
     final Iterable<TransactionModel> expenseTransactions = _allTransactions
@@ -5546,52 +5870,121 @@ class AiChatService {
           return date.year == now.year && date.month == now.month;
         });
 
-    String? matchedCategory;
-    for (final TransactionModel tx in _allTransactions) {
-      final List<String> candidates = <String>[
-        tx.category.trim(),
-        tx.aiCategory.trim(),
-      ].where((String value) => value.isNotEmpty).toList();
-
-      for (final String category in candidates) {
-        final String normalized = category.toLowerCase();
-        if (input.contains(normalized)) {
-          matchedCategory = category;
-          break;
-        }
-      }
-
-      if (matchedCategory != null) {
-        break;
-      }
-    }
-
-    final Iterable<TransactionModel> filtered = matchedCategory == null
+    final Iterable<TransactionModel> filtered = topic == null
         ? expenseTransactions
         : expenseTransactions.where((TransactionModel tx) {
             final String category = tx.category.toLowerCase();
             final String aiCategory = tx.aiCategory.toLowerCase();
             final String note = tx.note.toLowerCase();
-            final String target = matchedCategory!.toLowerCase();
+            final String target = topic;
             return category.contains(target) ||
                 aiCategory.contains(target) ||
                 note.contains(target);
           });
 
-    final double total = filtered.fold<double>(
+    final double totalBase = filtered.fold<double>(
       0,
       (double value, TransactionModel tx) => value + tx.amount,
+    );
+    final String activeCurrencyCode =
+        CurrencyPreferenceController.instance.currentCode;
+    final double total = CurrencyPreferenceController.instance.fromBaseAmount(
+      totalBase,
+      activeCurrencyCode,
     );
 
     final String symbol =
         CurrencyPreferenceController.instance.currentOption.symbol;
     final String periodLabel = thisMonth ? 'this month' : 'until now';
 
-    if (matchedCategory != null) {
-      return 'You spent $symbol${total.toStringAsFixed(2)} on ${matchedCategory.toLowerCase()} $periodLabel.';
+    if (topic != null) {
+      return 'You spent $symbol${total.toStringAsFixed(2)} on $topic $periodLabel.';
     }
 
     return 'You spent $symbol${total.toStringAsFixed(2)} in total $periodLabel.';
+  }
+
+  String? _extractSpendingTopic(String input) {
+    final List<String> tokens = input
+        .split(RegExp(r'[^a-z0-9]+'))
+        .where((String token) => token.length >= 3)
+        .where((String token) => !_spendingStopWords.contains(token))
+        .toList();
+
+    if (tokens.isEmpty) {
+      return null;
+    }
+
+    if (tokens.contains('fuel') ||
+        tokens.contains('gas') ||
+        tokens.contains('petrol') ||
+        tokens.contains('diesel')) {
+      return 'fuel';
+    }
+
+    for (final String token in tokens) {
+      final bool found = _allTransactions.any((TransactionModel tx) {
+        final String category = tx.category.toLowerCase();
+        final String aiCategory = tx.aiCategory.toLowerCase();
+        final String note = tx.note.toLowerCase();
+        return category.contains(token) ||
+            aiCategory.contains(token) ||
+            note.contains(token);
+      });
+
+      if (found) {
+        return token;
+      }
+    }
+
+    return null;
+  }
+
+  Future<void> _refreshTransactionCache() async {
+    final User? user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      throw Exception('User not signed in');
+    }
+
+    _allTransactions = await BudgetFirestoreService.instance
+        .watchAllTransactions(user)
+        .first;
+  }
+
+  void _appendConversation(String role, String content) {
+    _conversation.add(<String, String>{'role': role, 'content': content});
+
+    // Keep the system message and trim older user/assistant turns.
+    if (_conversation.length > _maxConversationMessages + 1) {
+      _conversation.removeRange(
+        1,
+        _conversation.length - _maxConversationMessages,
+      );
+    }
+  }
+
+  String _extractAssistantText(dynamic content) {
+    if (content is String) {
+      return content;
+    }
+
+    if (content is List<dynamic>) {
+      final StringBuffer buffer = StringBuffer();
+      for (final dynamic item in content) {
+        if (item is Map<String, dynamic>) {
+          final dynamic text = item['text'];
+          if (text is String && text.isNotEmpty) {
+            if (buffer.isNotEmpty) {
+              buffer.write('\n');
+            }
+            buffer.write(text);
+          }
+        }
+      }
+      return buffer.toString();
+    }
+
+    return '';
   }
 }
 
@@ -5613,6 +6006,9 @@ import 'budget_firestore_service.dart';
 import '../controllers/currency_controllers.dart';
 
 class AiExpenseService {
+  static bool _isLoggingTransaction = false;
+  static bool _isParsingReceipt = false;
+
   String get _apiKey {
     final String? key = dotenv.env['GEMINI_API_KEY'];
     if (key == null || key.isEmpty) {
@@ -5673,18 +6069,26 @@ class AiExpenseService {
   // 3. Shared Logic for Gemini & Firestore
   // ==========================================
   Future<void> _processAndSave(List<Content> content, {String? rawText}) async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      throw Exception('User must be signed in.');
+    if (_isLoggingTransaction) {
+      throw Exception('Please wait for the current AI request to finish.');
     }
 
-    final model = GenerativeModel(
-      model: 'gemini-2.5-flash',
-      apiKey: _apiKey,
-      generationConfig: GenerationConfig(responseMimeType: 'application/json'),
-    );
+    _isLoggingTransaction = true;
 
     try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        throw Exception('User must be signed in.');
+      }
+
+      final model = GenerativeModel(
+        model: 'gemini-2.5-flash',
+        apiKey: _apiKey,
+        generationConfig: GenerationConfig(
+          responseMimeType: 'application/json',
+        ),
+      );
+
       final response = await model.generateContent(content);
       String? responseText = response.text;
 
@@ -5734,6 +6138,8 @@ class AiExpenseService {
     } catch (e) {
       print('🔥 FATAL AI ERROR: $e');
       throw Exception(e.toString());
+    } finally {
+      _isLoggingTransaction = false;
     }
   }
 
@@ -5744,32 +6150,44 @@ class AiExpenseService {
     Uint8List imageBytes,
     String mimeType,
   ) async {
-    final String selectedCurrency =
-        CurrencyPreferenceController.instance.currentCode;
-    final model = GenerativeModel(
-      model: 'gemini-2.5-flash',
-      apiKey: _apiKey,
-      generationConfig: GenerationConfig(responseMimeType: 'application/json'),
-    );
-
-    final response = await model.generateContent([
-      Content.multi([
-        TextPart(
-          '$_systemPrompt\n\nSelected Currency: "$selectedCurrency"\n\nFor this parsing call, make "note" a detailed but concise description (about 1-2 sentences) including merchant, likely purchased items/services, and useful context for transaction history.',
-        ),
-        DataPart(mimeType, imageBytes),
-      ]),
-    ]);
-
-    String? responseText = response.text;
-    if (responseText != null) {
-      responseText = responseText
-          .replaceAll('```json', '')
-          .replaceAll('```', '')
-          .trim();
-      return jsonDecode(responseText);
+    if (_isParsingReceipt) {
+      throw Exception('Please wait for the current receipt scan to finish.');
     }
-    throw Exception('AI returned an empty response.');
+
+    _isParsingReceipt = true;
+
+    try {
+      final String selectedCurrency =
+          CurrencyPreferenceController.instance.currentCode;
+      final model = GenerativeModel(
+        model: 'gemini-2.5-flash',
+        apiKey: _apiKey,
+        generationConfig: GenerationConfig(
+          responseMimeType: 'application/json',
+        ),
+      );
+
+      final response = await model.generateContent([
+        Content.multi([
+          TextPart(
+            '$_systemPrompt\n\nSelected Currency: "$selectedCurrency"\n\nFor this parsing call, make "note" a detailed but concise description (about 1-2 sentences) including merchant, likely purchased items/services, and useful context for transaction history.',
+          ),
+          DataPart(mimeType, imageBytes),
+        ]),
+      ]);
+
+      String? responseText = response.text;
+      if (responseText != null) {
+        responseText = responseText
+            .replaceAll('```json', '')
+            .replaceAll('```', '')
+            .trim();
+        return jsonDecode(responseText);
+      }
+      throw Exception('AI returned an empty response.');
+    } finally {
+      _isParsingReceipt = false;
+    }
   }
 
   bool _isSupportedCurrency(String code) {
@@ -6055,6 +6473,38 @@ class BudgetFirestoreService {
     });
   }
 
+  Future<void> deleteGoal({required User user, required String goalId}) async {
+    await _goals(user).doc(goalId).delete();
+  }
+
+  Future<void> updateGoalDeadline({
+    required User user,
+    required String goalId,
+    required DateTime deadline,
+  }) async {
+    final DateTime now = DateTime.now();
+    final DateTime today = DateTime(now.year, now.month, now.day);
+    final DateTime normalizedDeadline = DateTime(
+      deadline.year,
+      deadline.month,
+      deadline.day,
+    );
+
+    if (normalizedDeadline.isBefore(today)) {
+      throw FirebaseException(
+        plugin: 'cloud_firestore',
+        code: 'invalid-deadline',
+        message: 'Deadline cannot be older than today.',
+      );
+    }
+
+    await _goals(user).doc(goalId).update(<String, dynamic>{
+      'deadline': Timestamp.fromDate(normalizedDeadline),
+      'status': 'active',
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
   Future<double> getCurrentMonthNetTotal(User user) async {
     final DateTime now = DateTime.now();
     final DateTime startOfMonth = DateTime(now.year, now.month);
@@ -6211,6 +6661,7 @@ class BudgetFirestoreService {
       await NotificationService.instance.showNotification(
         title: 'Savings Goal Reached',
         body: 'Congratulations! You reached "$reachedGoalTitle".',
+        payload: NotificationService.payloadGoals,
       );
     }
   }
@@ -6375,7 +6826,11 @@ class CurrencyPreferenceController {
 ========================================
 FILE PATH: lib\services\notification_service.dart
 ========================================
+import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+
+import '../app_navigator.dart';
+import '../screens/main_wrapper.dart';
 
 class NotificationService {
   const NotificationService._();
@@ -6384,6 +6839,10 @@ class NotificationService {
 
   static final FlutterLocalNotificationsPlugin _plugin =
       FlutterLocalNotificationsPlugin();
+
+  static const String payloadTransactions = 'transactions';
+  static const String payloadGoals = 'goals';
+  static const String payloadChat = 'chat';
 
   Future<void> init() async {
     const AndroidInitializationSettings androidInit =
@@ -6400,7 +6859,19 @@ class NotificationService {
       iOS: iosInit,
     );
 
-    await _plugin.initialize(initSettings);
+    await _plugin.initialize(
+      settings: initSettings,
+      onDidReceiveNotificationResponse: _handleNotificationResponse,
+    );
+
+    final NotificationAppLaunchDetails? launchDetails = await _plugin
+        .getNotificationAppLaunchDetails();
+    final NotificationResponse? launchResponse =
+        launchDetails?.notificationResponse;
+    if (launchDetails?.didNotificationLaunchApp ?? false) {
+      _handleNotificationResponse(launchResponse);
+    }
+
     await _plugin
         .resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin
@@ -6411,6 +6882,7 @@ class NotificationService {
   Future<void> showNotification({
     required String title,
     required String body,
+    String? payload,
   }) async {
     const AndroidNotificationDetails androidDetails =
         AndroidNotificationDetails(
@@ -6428,8 +6900,175 @@ class NotificationService {
 
     final int id = DateTime.now().microsecondsSinceEpoch.remainder(1 << 31);
 
-    await _plugin.show(id, title, body, platformDetails);
+    await _plugin.show(
+      id: id,
+      title: title,
+      body: body,
+      notificationDetails: platformDetails,
+      payload: payload,
+    );
   }
+
+  void _handleNotificationResponse(NotificationResponse? response) {
+    if (response == null) {
+      return;
+    }
+
+    final NavigatorState? navigator = appNavigatorKey.currentState;
+    final String payload = (response.payload ?? '').trim();
+    if (navigator == null || payload.isEmpty) {
+      return;
+    }
+
+    switch (payload) {
+      case payloadTransactions:
+        navigator.pushNamed('/transactions');
+        break;
+      case payloadGoals:
+        navigator.pushAndRemoveUntil(
+          MaterialPageRoute<void>(
+            builder: (_) => const MainWrapperScreen(initialIndex: 2),
+          ),
+          (Route<dynamic> route) => false,
+        );
+        break;
+      case payloadChat:
+        navigator.pushNamed('/chat');
+        break;
+      default:
+        break;
+    }
+  }
+}
+
+
+
+
+========================================
+FILE PATH: lib\widgets\google_sign_in_button.dart
+========================================
+import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+
+enum GoogleSignInButtonStyle { auto, light, dark, neutral }
+
+class GoogleSignInButton extends StatelessWidget {
+  const GoogleSignInButton({
+    super.key,
+    required this.onPressed,
+    this.label = 'Sign in with Google',
+    this.styleType = GoogleSignInButtonStyle.auto,
+  });
+
+  final VoidCallback? onPressed;
+  final String label;
+  final GoogleSignInButtonStyle styleType;
+
+  static const String _googleSvgString = '''
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" xmlns:xlink="http://www.w3.org/1999/xlink" style="display: block;">
+  <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"></path>
+  <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"></path>
+  <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"></path>
+  <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"></path>
+  <path fill="none" d="M0 0h48v48H0z"></path>
+</svg>
+''';
+
+  @override
+  Widget build(BuildContext context) {
+    final _GoogleButtonPalette palette = _paletteFor(context, styleType);
+
+    return Material(
+      color: palette.background,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(999),
+        side: BorderSide(color: palette.border, width: 1),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onPressed,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 48, minWidth: 220),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: <Widget>[
+                SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: SvgPicture.string(_googleSvgString),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 15,
+                    height: 1,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0,
+                    color: palette.foreground,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  _GoogleButtonPalette _paletteFor(
+    BuildContext context,
+    GoogleSignInButtonStyle style,
+  ) {
+    final GoogleSignInButtonStyle resolvedStyle =
+        style == GoogleSignInButtonStyle.auto
+        ? Theme.of(context).brightness == Brightness.dark
+              ? GoogleSignInButtonStyle.dark
+              : GoogleSignInButtonStyle.light
+        : style;
+
+    switch (resolvedStyle) {
+      case GoogleSignInButtonStyle.auto:
+        return const _GoogleButtonPalette(
+          background: Color(0xFFFFFFFF),
+          border: Color(0xFF747775),
+          foreground: Color(0xFF1F1F1F),
+        );
+      case GoogleSignInButtonStyle.dark:
+        return const _GoogleButtonPalette(
+          background: Color(0xFF131314),
+          border: Color(0xFF8E918F),
+          foreground: Color(0xFFE3E3E3),
+        );
+      case GoogleSignInButtonStyle.neutral:
+        return const _GoogleButtonPalette(
+          background: Color(0xFFE9E9E9),
+          border: Color(0xFFE9E9E9),
+          foreground: Color(0xFF1F1F1F),
+        );
+      case GoogleSignInButtonStyle.light:
+        return const _GoogleButtonPalette(
+          background: Color(0xFFFFFFFF),
+          border: Color(0xFF747775),
+          foreground: Color(0xFF1F1F1F),
+        );
+    }
+  }
+}
+
+class _GoogleButtonPalette {
+  const _GoogleButtonPalette({
+    required this.background,
+    required this.border,
+    required this.foreground,
+  });
+
+  final Color background;
+  final Color border;
+  final Color foreground;
 }
 
 

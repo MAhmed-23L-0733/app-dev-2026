@@ -133,12 +133,20 @@ class _MainWrapperScreenState extends State<MainWrapperScreen> {
                 ),
               ),
             ),
-            floatingActionButton: FloatingActionButton(
-              onPressed: () => Navigator.pushNamed(context, '/chat'),
-              backgroundColor: const Color(0xFF1565C0),
-              tooltip: 'AI Chat',
-              child: const Icon(Icons.smart_toy_rounded, color: Colors.white),
-            ),
+            floatingActionButton: uiState.selectedIndex == 0
+                ? Padding(
+                    padding: const EdgeInsets.only(bottom: 40, right: 10),
+                    child: FloatingActionButton(
+                      onPressed: () => Navigator.pushNamed(context, '/chat'),
+                      backgroundColor: const Color(0xFF1565C0),
+                      tooltip: 'AI Chat',
+                      child: const Icon(
+                        Icons.smart_toy_rounded,
+                        color: Colors.white,
+                      ),
+                    ),
+                  )
+                : null,
             floatingActionButtonLocation:
                 FloatingActionButtonLocation.endDocked,
           );

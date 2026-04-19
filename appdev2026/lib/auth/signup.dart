@@ -8,6 +8,7 @@ import 'google_auth_service.dart';
 import 'user_profile_service.dart';
 import '../screens/main_wrapper.dart';
 import '../theme_controller.dart';
+import '../widgets/google_sign_in_button.dart';
 import '../widgets/neon_surface.dart';
 
 class SignUpScreen extends StatefulWidget {
@@ -312,30 +313,11 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                   : const Text('Sign Up'),
                             ),
                             const SizedBox(height: 14),
-                            OutlinedButton(
+                            GoogleSignInButton(
                               onPressed: uiState.isLoading
                                   ? null
                                   : _continueWithGoogle,
-                              style: OutlinedButton.styleFrom(
-                                minimumSize: const Size.fromHeight(56),
-                                side: BorderSide(
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.primary.withOpacity(0.35),
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(18),
-                                ),
-                              ),
-                              child: const Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                mainAxisSize: MainAxisSize.min,
-                                children: <Widget>[
-                                  _GoogleGlyph(),
-                                  SizedBox(width: 12),
-                                  Text('Continue with Google'),
-                                ],
-                              ),
+                              label: 'Continue with Google',
                             ),
                             const SizedBox(height: 10),
                             TextButton(
@@ -391,43 +373,5 @@ class _SignUpUiState extends ChangeNotifier {
     passwordController.dispose();
     confirmPasswordController.dispose();
     super.dispose();
-  }
-}
-
-class _GoogleGlyph extends StatelessWidget {
-  const _GoogleGlyph();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 28,
-      height: 28,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: Theme.of(context).colorScheme.surface.withOpacity(0.95),
-        border: Border.all(color: Colors.white.withOpacity(0.22)),
-      ),
-      alignment: Alignment.center,
-      child: ShaderMask(
-        shaderCallback: (Rect bounds) {
-          return const LinearGradient(
-            colors: <Color>[
-              Color(0xFF4285F4),
-              Color(0xFFEA4335),
-              Color(0xFFFABB05),
-              Color(0xFF34A853),
-            ],
-          ).createShader(bounds);
-        },
-        child: const Text(
-          'G',
-          style: TextStyle(
-            fontWeight: FontWeight.w900,
-            fontSize: 18,
-            color: Colors.white,
-          ),
-        ),
-      ),
-    );
   }
 }
