@@ -6,7 +6,7 @@ import 'package:google_generative_ai/google_generative_ai.dart';
 
 import 'budget_firestore_service.dart';
 
-// ⚠️ IMPORTANT: Make sure this path points to where you saved your CurrencyPreferenceController!
+// IMPORTANT: Make sure this path points to where you saved your CurrencyPreferenceController!
 import '../controllers/currency_controllers.dart';
 
 class AiExpenseService {
@@ -37,9 +37,9 @@ class AiExpenseService {
     3. REFUNDS & RETURNS: If the document is a return receipt or explicitly shows a refunded amount, classify it as "income" (because money is returning to the user's pocket) and set the aiCategory to "Refunds".
     ''';
 
-  // ==========================================
+  // Section divider
   // 1. Text Logging Method (Used on Home Screen)
-  // ==========================================
+  // Section divider
   Future<void> logExpenseFromText(String userInput) async {
     final String selectedCurrency =
         CurrencyPreferenceController.instance.currentCode;
@@ -51,9 +51,9 @@ class AiExpenseService {
     await _processAndSave(content, rawText: userInput);
   }
 
-  // ==========================================
+  // Section divider
   // 2. Image Logging Method (Used on Home Screen)
-  // ==========================================
+  // Section divider
   Future<void> logExpenseFromImage(
     Uint8List imageBytes,
     String mimeType,
@@ -69,9 +69,9 @@ class AiExpenseService {
     await _processAndSave(content);
   }
 
-  // ==========================================
+  // Section divider
   // 3. Shared Logic for Gemini & Firestore
-  // ==========================================
+  // Section divider
   Future<void> _processAndSave(List<Content> content, {String? rawText}) async {
     if (_isLoggingTransaction) {
       throw Exception('Please wait for the current AI request to finish.');
@@ -113,7 +113,7 @@ class AiExpenseService {
         final String category = jsonMap['aiCategory'] as String? ?? 'General';
         final String note = jsonMap['note'] as String? ?? 'Quick Log';
 
-        // 🟢 Fetch the globally selected currency code from your controller
+        // Fetch the globally selected currency code from your controller
         final String activeCurrency =
             CurrencyPreferenceController.instance.currentCode;
         final String sourceCurrencyFromAi =
@@ -147,9 +147,9 @@ class AiExpenseService {
     }
   }
 
-  // ==========================================
+  // Section divider
   // 4. Parse Data Method (Used on Add Transaction Screen)
-  // ==========================================
+  // Section divider
   Future<Map<String, dynamic>> parseReceiptData(
     Uint8List imageBytes,
     String mimeType,

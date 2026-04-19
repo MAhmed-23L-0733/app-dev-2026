@@ -21,10 +21,10 @@ class TransactionModel {
     required this.monthKey,
   });
 
-  // ==========================================
+  // Section divider
   // ADDED FOR AI HACKATHON INTEGRATION
   // Converts the Gemini JSON output into this model
-  // ==========================================
+  // Section divider
   factory TransactionModel.fromJson(
     Map<String, dynamic> json,
     String generatedId,
