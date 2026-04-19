@@ -23,7 +23,12 @@ class SpendWiseLogo extends StatelessWidget {
           TextSpan(
             text: 'Spend',
             style: TextStyle(
-              color: Colors.blue.shade400, // A vibrant, lighter blue
+              color: const Color.fromARGB(
+                255,
+                51,
+                130,
+                195,
+              ), // A vibrant, lighter blue
               shadows: [
                 Shadow(
                   color: Colors.blue.withOpacity(0.3),
@@ -36,14 +41,23 @@ class SpendWiseLogo extends StatelessWidget {
           TextSpan(
             text: 'Wise',
             style: TextStyle(
-              color: Colors.blue.shade900, // A deep, trustworthy navy blue
+              color: const Color.fromARGB(
+                255,
+                22,
+                94,
+                202,
+              ), // A deep, trustworthy navy blue
             ),
           ),
           TextSpan(
             text: '.',
             style: TextStyle(
-              color:
-                  Colors.blueAccent, // A pop of color for an aesthetic period
+              color: const Color.fromARGB(
+                255,
+                51,
+                130,
+                195,
+              ), // A pop of color for an aesthetic period
             ),
           ),
         ],

@@ -9,6 +9,22 @@ import '../widgets/neon_surface.dart';
 class ProfileView extends StatelessWidget {
   const ProfileView({super.key});
 
+  ButtonStyle _signOutButtonStyle(BuildContext context) {
+    final bool isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return ElevatedButton.styleFrom(
+      backgroundColor: isDark
+          ? Colors.red.shade900.withOpacity(0.28)
+          : Colors.red.shade50,
+      foregroundColor: isDark ? Colors.red.shade100 : Colors.red.shade900,
+      side: BorderSide(
+        color: isDark ? Colors.red.shade300 : Colors.red,
+        width: 1,
+      ),
+      elevation: 0,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final User? user = FirebaseAuth.instance.currentUser;
@@ -22,137 +38,120 @@ class ProfileView extends StatelessWidget {
 
     return Material(
       color: Colors.transparent,
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 120),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: <Widget>[
-            GlassCard(
-              child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: <Widget>[
-                  Container(
-                    width: 72,
-                    height: 72,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: LinearGradient(
-                        colors: <Color>[
-                          Theme.of(context).colorScheme.primary,
-                          Colors.blueAccent,
-                        ],
-                      ),
-                    ),
-                    alignment: Alignment.center,
-                    child: user?.photoURL != null
-                        ? ClipOval(
-                            child: Image.network(
-                              user!.photoURL!,
-                              width: 72,
-                              height: 72,
-                              fit: BoxFit.cover,
-                            ),
-                          )
-                        : Text(
-                            _initials(user),
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: isCompactScreen ? 22 : 26,
-                              fontWeight: FontWeight.w800,
+                  GlassCard(
+                    child: Row(
+                      children: <Widget>[
+                        Container(
+                          width: 72,
+                          height: 72,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: LinearGradient(
+                              colors: <Color>[
+                                Theme.of(context).colorScheme.primary,
+                                Colors.blueAccent,
+                              ],
                             ),
                           ),
+                          alignment: Alignment.center,
+                          child: user?.photoURL != null
+                              ? ClipOval(
+                                  child: Image.network(
+                                    user!.photoURL!,
+                                    width: 72,
+                                    height: 72,
+                                    fit: BoxFit.cover,
+                                  ),
+                                )
+                              : Text(
+                                  _initials(user),
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: isCompactScreen ? 22 : 26,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: <Widget>[
+                              Text(
+                                name,
+                                style: Theme.of(context).textTheme.headlineSmall
+                                    ?.copyWith(
+                                      fontWeight: FontWeight.w800,
+                                      color: onSurface,
+                                    ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                email,
+                                style: Theme.of(context).textTheme.bodyMedium
+                                    ?.copyWith(
+                                      color: onSurface.withOpacity(0.7),
+                                    ),
+                              ),
+                              Text(
+                                user?.uid ?? 'No user id available',
+                                style: Theme.of(context).textTheme.bodySmall
+                                    ?.copyWith(
+                                      color: onSurface.withOpacity(0.58),
+                                    ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  const SizedBox(width: 16),
-                  Expanded(
+                  const SizedBox(height: 16),
+                  GlassCard(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: <Widget>[
                         Text(
-                          name,
-                          style: Theme.of(context).textTheme.headlineSmall
+                          'Account details',
+                          style: Theme.of(context).textTheme.titleLarge
                               ?.copyWith(
                                 fontWeight: FontWeight.w800,
                                 color: onSurface,
                               ),
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          email,
-                          style: Theme.of(context).textTheme.bodyMedium
-                              ?.copyWith(color: onSurface.withOpacity(0.7)),
-                        ),
-                        Text(
-                          user?.uid ?? 'No user id available',
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(color: onSurface.withOpacity(0.58)),
-                        ),
+                        const SizedBox(height: 14),
+
+                        const SizedBox(height: 12),
+                        _SummaryRow(label: 'Joined', value: joined),
+                        const SizedBox(height: 12),
+                        _SummaryRow(label: 'Last sign-in', value: lastSignIn),
                       ],
                     ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 16),
-            GlassCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(
-                    'Account details',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      color: onSurface,
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  _SummaryRow(label: 'Authentication', value: provider),
-                  const SizedBox(height: 12),
-                  _SummaryRow(
-                    label: 'Currency',
-                    value: 'Managed from Dashboard',
-                  ),
-                  const SizedBox(height: 12),
-                  _SummaryRow(label: 'Joined', value: joined),
-                  const SizedBox(height: 12),
-                  _SummaryRow(label: 'Last sign-in', value: lastSignIn),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-            GlassCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(
-                    'Security',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      color: onSurface,
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: Icon(
-                      Icons.security_rounded,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                    title: Text('Session', style: TextStyle(color: onSurface)),
-                    subtitle: Text(
-                      'Manage the signed-in account from this device',
-                      style: TextStyle(color: onSurface.withOpacity(0.68)),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 18),
-            ElevatedButton.icon(
+          ),
+          SafeArea(
+            top: false,
+            minimum: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+            child: ElevatedButton.icon(
               onPressed: () => _confirmSignOut(context),
+              style: _signOutButtonStyle(context),
               icon: const Icon(Icons.logout_rounded),
               label: const Text('Sign out'),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -174,6 +173,7 @@ class ProfileView extends StatelessWidget {
                 ),
                 ElevatedButton(
                   onPressed: () => Navigator.of(dialogContext).pop(true),
+                  style: _signOutButtonStyle(dialogContext),
                   child: const Text('Sign out'),
                 ),
               ],

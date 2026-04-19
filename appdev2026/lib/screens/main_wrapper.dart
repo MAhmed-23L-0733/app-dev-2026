@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import 'add_transaction.dart';
 import 'goals.dart';
 import 'home.dart';
+import 'insights.dart';
 import 'profile.dart';
 import '../auth/user_profile_service.dart';
 import '../theme_controller.dart';
@@ -30,7 +31,7 @@ class _MainWrapperScreenState extends State<MainWrapperScreen> {
   void initState() {
     super.initState();
     final int safeInitialIndex =
-        widget.initialIndex >= 0 && widget.initialIndex <= 3
+        widget.initialIndex >= 0 && widget.initialIndex <= 4
         ? widget.initialIndex
         : 0;
     _uiState = _MainWrapperUiState(initialIndex: safeInitialIndex);
@@ -66,7 +67,7 @@ class _MainWrapperScreenState extends State<MainWrapperScreen> {
               automaticallyImplyLeading: false,
               leadingWidth: isCompactScreen ? 172 : 212,
               leading: Padding(
-                padding: const EdgeInsets.only(left: 16),
+                padding: const EdgeInsets.only(left: 6),
                 child: Align(
                   alignment: Alignment.centerLeft,
                   child: SpendWiseLogo(fontSize: isCompactScreen ? 20 : 24),
@@ -93,6 +94,7 @@ class _MainWrapperScreenState extends State<MainWrapperScreen> {
                     HomeView(),
                     AddTransactionView(),
                     GoalsView(),
+                    InsightsView(),
                     ProfileView(),
                   ],
                 ),
@@ -105,7 +107,7 @@ class _MainWrapperScreenState extends State<MainWrapperScreen> {
               minimum: const EdgeInsets.only(bottom: 12),
               child: Padding(
                 // We leave bottom padding at 0 here because SafeArea handles it now
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(28),
                   child: BottomNavigationBar(
@@ -118,11 +120,15 @@ class _MainWrapperScreenState extends State<MainWrapperScreen> {
                       ),
                       BottomNavigationBarItem(
                         icon: Icon(Icons.add_circle_outline_rounded),
-                        label: 'Add transaction',
+                        label: 'Add Transactions',
                       ),
                       BottomNavigationBarItem(
                         icon: Icon(Icons.flag_rounded),
                         label: 'Goals',
+                      ),
+                      BottomNavigationBarItem(
+                        icon: Icon(Icons.insights_rounded),
+                        label: 'Insights',
                       ),
                       BottomNavigationBarItem(
                         icon: Icon(Icons.person_rounded),

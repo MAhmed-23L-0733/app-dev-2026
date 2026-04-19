@@ -77,7 +77,6 @@ ThemeData _buildTheme(Brightness brightness) {
   ).textTheme;
   final TextTheme textTheme = _responsiveTextTheme(baseTextTheme);
 
-  // Clean Black and White surfaces
   final Color surface = isDark
       ? const Color(0xFF121212)
       : const Color(0xFFFFFFFF);
@@ -93,12 +92,17 @@ ThemeData _buildTheme(Brightness brightness) {
       ? const Color(0xFF42A5F5)
       : const Color(0xFF1565C0);
 
-  final Color appBarBackground = surface.withOpacity(isDark ? 0.90 : 0.95);
+  final Color appBarBackground = isDark
+      ? const Color.fromARGB(255, 23, 48, 92)
+      : const Color(0xFFBEDEFB);
+  ;
   final Color cardBackground = surface.withOpacity(isDark ? 0.40 : 0.95);
   final Color fieldBackground = isDark
       ? Colors.white.withOpacity(0.08)
       : const Color(0xFFF0F4F8);
-  final Color navBackground = surface.withOpacity(isDark ? 0.90 : 0.95);
+  final Color navBackground = isDark
+      ? const Color.fromARGB(255, 23, 48, 92)
+      : const Color(0xFFBEDEFB);
 
   final ColorScheme colorScheme = ColorScheme(
     brightness: brightness,
