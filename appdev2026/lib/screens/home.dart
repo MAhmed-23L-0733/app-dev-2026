@@ -84,16 +84,9 @@ class HomeView extends StatelessWidget {
                               (double total, TransactionModel transaction) =>
                                   total + transaction.amount,
                             );
-                        final bool shouldUseDerivedTotals =
-                            transactions.isNotEmpty &&
-                            summary.incomeTotal == 0 &&
-                            summary.expenseTotal == 0;
-                        final double incomeTotal = shouldUseDerivedTotals
-                            ? derivedIncomeTotal
-                            : summary.incomeTotal;
-                        final double expenseTotal = shouldUseDerivedTotals
-                            ? derivedExpenseTotal
-                            : summary.expenseTotal;
+                        // Always trust transaction stream totals for UI consistency.
+                        final double incomeTotal = derivedIncomeTotal;
+                        final double expenseTotal = derivedExpenseTotal;
                         final double balanceBase = incomeTotal - expenseTotal;
 
                         return SingleChildScrollView(
