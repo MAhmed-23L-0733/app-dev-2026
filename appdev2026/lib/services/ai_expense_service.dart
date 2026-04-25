@@ -140,7 +140,7 @@ class AiExpenseService {
         throw Exception('AI returned an empty response.');
       }
     } catch (e) {
-      print('🔥 FATAL AI ERROR: $e');
+      print(' FATAL AI ERROR: $e');
       throw Exception(e.toString());
     } finally {
       _isLoggingTransaction = false;

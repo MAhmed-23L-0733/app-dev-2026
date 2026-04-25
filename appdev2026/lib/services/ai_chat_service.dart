@@ -253,7 +253,7 @@ class AiChatService {
       _appendConversation('assistant', assistantText);
       return assistantText;
     } catch (e) {
-      print('🔥 Chat Error: $e');
+      print('Chat Error: $e');
       return 'Sorry, my brain is taking a break right now. Try again in a second!';
     } finally {
       _isSendingMessage = false;
@@ -262,11 +262,11 @@ class AiChatService {
 
   // Temporary diagnostic helper to verify OpenRouter connectivity.
   Future<void> testConnection() async {
-    print('🧪 Testing OpenRouter connection...');
+    print('Testing OpenRouter connection...');
     final String key = _openRouterApiKey;
     final int previewLength = key.length < 15 ? key.length : 15;
-    print('🔑 Key: ${key.substring(0, previewLength)}...');
-    print('🤖 Model: $_openRouterModel');
+    print('Key: ${key.substring(0, previewLength)}...');
+    print('Model: $_openRouterModel');
 
     try {
       final http.Response response = await http.post(
@@ -285,10 +285,10 @@ class AiChatService {
         }),
       );
 
-      print('📡 Status: ${response.statusCode}');
-      print('📦 Body: ${response.body}');
+      print('Status: ${response.statusCode}');
+      print('Body: ${response.body}');
     } catch (e) {
-      print('❌ Error: $e');
+      print('Error: $e');
     }
   }
 

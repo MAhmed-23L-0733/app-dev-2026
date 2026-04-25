@@ -61,13 +61,13 @@ class _MainWrapperScreenState extends State<MainWrapperScreen> {
       child: Consumer<_MainWrapperUiState>(
         builder: (BuildContext context, _MainWrapperUiState uiState, _) {
           return Scaffold(
-            extendBody: true,
+            extendBody: false,
             backgroundColor: Colors.transparent,
             appBar: AppBar(
               automaticallyImplyLeading: false,
               leadingWidth: isCompactScreen ? 172 : 212,
               leading: Padding(
-                padding: const EdgeInsets.only(left: 6),
+                padding: const EdgeInsets.only(left: 16),
                 child: Align(
                   alignment: Alignment.centerLeft,
                   child: SpendWiseLogo(fontSize: isCompactScreen ? 20 : 24),
@@ -93,8 +93,8 @@ class _MainWrapperScreenState extends State<MainWrapperScreen> {
                   children: const <Widget>[
                     HomeView(),
                     AddTransactionView(),
-                    GoalsView(),
                     InsightsView(),
+                    GoalsView(),
                     ProfileView(),
                   ],
                 ),
@@ -102,42 +102,35 @@ class _MainWrapperScreenState extends State<MainWrapperScreen> {
             ),
 
             // --- MODERNIZED BOTTOM NAVIGATION BAR ---
-            bottomNavigationBar: SafeArea(
-              // Automatically pads for the gesture bar, but guarantees AT LEAST 12px on older phones
-              minimum: const EdgeInsets.only(bottom: 12),
-              child: Padding(
-                // We leave bottom padding at 0 here because SafeArea handles it now
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(28),
-                  child: BottomNavigationBar(
-                    currentIndex: uiState.selectedIndex,
-                    onTap: _handleTabChanged,
-                    items: const <BottomNavigationBarItem>[
-                      BottomNavigationBarItem(
-                        icon: Icon(Icons.home_rounded),
-                        label: 'Dashboard',
-                      ),
-                      BottomNavigationBarItem(
-                        icon: Icon(Icons.add_circle_outline_rounded),
-                        label: 'Add Transactions',
-                      ),
-                      BottomNavigationBarItem(
-                        icon: Icon(Icons.flag_rounded),
-                        label: 'Goals',
-                      ),
-                      BottomNavigationBarItem(
-                        icon: Icon(Icons.insights_rounded),
-                        label: 'Insights',
-                      ),
-                      BottomNavigationBarItem(
-                        icon: Icon(Icons.person_rounded),
-                        label: 'Profile',
-                      ),
-                    ],
-                  ),
+            bottomNavigationBar: BottomNavigationBar(
+              backgroundColor: Theme.of(
+                context,
+              ).bottomNavigationBarTheme.backgroundColor,
+              elevation: 0,
+              currentIndex: uiState.selectedIndex,
+              onTap: _handleTabChanged,
+              items: const <BottomNavigationBarItem>[
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.home_rounded),
+                  label: 'Dashboard',
                 ),
-              ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.add_circle_outline_rounded),
+                  label: 'Add transaction',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.insights_rounded),
+                  label: 'Insights',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.flag_rounded),
+                  label: 'Goals',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.person_rounded),
+                  label: 'Profile',
+                ),
+              ],
             ),
             floatingActionButton: uiState.selectedIndex == 0
                 ? Padding(

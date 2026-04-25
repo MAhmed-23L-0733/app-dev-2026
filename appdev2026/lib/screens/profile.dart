@@ -102,13 +102,6 @@ class ProfileView extends StatelessWidget {
                                       color: onSurface.withOpacity(0.7),
                                     ),
                               ),
-                              Text(
-                                user?.uid ?? 'No user id available',
-                                style: Theme.of(context).textTheme.bodySmall
-                                    ?.copyWith(
-                                      color: onSurface.withOpacity(0.58),
-                                    ),
-                              ),
                             ],
                           ),
                         ),

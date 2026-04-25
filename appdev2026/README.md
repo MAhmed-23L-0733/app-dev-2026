@@ -15,3 +15,14 @@ A few resources to get you started if this is your first Flutter project:
 For help getting started with Flutter development, view the
 [online documentation](https://docs.flutter.dev/), which offers tutorials,
 samples, guidance on mobile development, and a full API reference.
+
+
+lib/
+├── main.dart              ← App entry point + theme setup
+├── theme_controller.dart  ← App-wide theme state (ValueNotifier)
+├── auth/                  ← Authentication layer
+├── models/                ← Plain data classes (DTOs)
+├── controllers/           ← Thin controllers (ValueNotifier-based)
+├── services/              ← Business logic + data access
+├── screens/               ← UI (Views)
+└── widgets/               ← Reusable UI components

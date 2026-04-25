@@ -31,6 +31,10 @@ class BudgetFirestoreService {
     return _userDoc(user.uid).collection('monthlySummaries');
   }
 
+  CollectionReference<Map<String, dynamic>> _insights(User user) {
+    return _userDoc(user.uid).collection('insights');
+  }
+
   Future<void> ensureBudgetNodes({required User user}) async {
     final DateTime now = DateTime.now();
     final String monthKey = _monthKey(now);
@@ -91,6 +95,54 @@ class BudgetFirestoreService {
           (QuerySnapshot<Map<String, dynamic>> snapshot) =>
               snapshot.docs.map(TransactionModel.fromFirestore).toList(),
         );
+  }
+
+  Stream<List<TransactionModel>> watchTransactionsForRecentMonths(
+    User user, {
+    int months = 12,
+    DateTime? referenceDate,
+  }) {
+    final DateTime base = referenceDate ?? DateTime.now();
+    final int normalizedMonths = months < 1 ? 1 : months;
+    final DateTime startOfRange = DateTime(
+      base.year,
+      base.month - (normalizedMonths - 1),
+      1,
+    );
+    final DateTime startOfNextMonth = DateTime(base.year, base.month + 1, 1);
+
+    return _transactions(user)
+        .where(
+          'timestamp',
+          isGreaterThanOrEqualTo: Timestamp.fromDate(startOfRange),
+        )
+        .where('timestamp', isLessThan: Timestamp.fromDate(startOfNextMonth))
+        .orderBy('timestamp', descending: false)
+        .snapshots()
+        .map(
+          (QuerySnapshot<Map<String, dynamic>> snapshot) =>
+              snapshot.docs.map(TransactionModel.fromFirestore).toList(),
+        );
+  }
+
+  Stream<DocumentSnapshot<Map<String, dynamic>>> watchMonthlyInsightCache(
+    User user, {
+    DateTime? month,
+  }) {
+    final String monthKey = _monthKey(month ?? DateTime.now());
+    return _insights(user).doc(monthKey).snapshots();
+  }
+
+  Future<void> upsertMonthlyInsightCache({
+    required User user,
+    required String monthKey,
+    required Map<String, dynamic> payload,
+  }) async {
+    await _insights(user).doc(monthKey).set(<String, dynamic>{
+      'monthKey': monthKey,
+      'updatedAt': FieldValue.serverTimestamp(),
+      ...payload,
+    }, SetOptions(merge: true));
   }
 
   Stream<List<GoalModel>> watchGoals(User user) {

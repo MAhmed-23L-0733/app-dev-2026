@@ -34,7 +34,7 @@ class MyApp extends StatelessWidget {
         return MaterialApp(
           navigatorKey: appNavigatorKey,
           debugShowCheckedModeBanner: false,
-          title: 'Hackathon Firebase App',
+          title: 'SpendWise',
           builder: (BuildContext context, Widget? child) {
             final MediaQueryData mediaQuery = MediaQuery.of(context);
             final bool isPhone = mediaQuery.size.width < 420;
@@ -95,7 +95,6 @@ ThemeData _buildTheme(Brightness brightness) {
   final Color appBarBackground = isDark
       ? const Color.fromARGB(255, 23, 48, 92)
       : const Color(0xFFBEDEFB);
-  ;
   final Color cardBackground = surface.withOpacity(isDark ? 0.40 : 0.95);
   final Color fieldBackground = isDark
       ? Colors.white.withOpacity(0.08)
