@@ -1,12 +1,9 @@
-import 'dart:typed_data';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import '../services/currency_service.dart';
-import '../services/ai_expense_service.dart';
 import '../services/budget_firestore_service.dart';
 import '../services/notification_service.dart';
 import '../widgets/neon_surface.dart';
@@ -23,7 +20,6 @@ class _AddTransactionViewState extends State<AddTransactionView> {
   final TextEditingController _amountController = TextEditingController();
   final TextEditingController _noteController = TextEditingController();
   final TextEditingController _categoryController = TextEditingController();
-  final ImagePicker _imagePicker = ImagePicker();
   late final _AddTransactionUiState _uiState;
 
   @override
@@ -91,101 +87,6 @@ class _AddTransactionViewState extends State<AddTransactionView> {
     }
   }
 
-  Future<void> _uploadReceiptAndAutoLog() async {
-    try {
-      final XFile? picked = await _imagePicker.pickImage(
-        source: ImageSource.gallery,
-        imageQuality: 92,
-      );
-
-      if (picked == null) {
-        return;
-      }
-
-      _uiState.setAiUploading(true);
-
-      final Uint8List bytes = await picked.readAsBytes();
-      final String mimeType = _resolveMimeType(picked.name);
-
-      final Map<String, dynamic> parsed = await AiExpenseService()
-          .parseReceiptData(bytes, mimeType);
-
-      final double amount = (parsed['amount'] as num? ?? 0).toDouble();
-      final String selectedCurrencyCode =
-          CurrencyPreferenceController.instance.currentCode;
-      final String sourceCurrencyCode =
-          (parsed['sourceCurrencyCode'] as String? ?? '').trim().toUpperCase();
-      final bool hasSupportedSourceCurrency = CurrencyPreferenceController
-          .options
-          .any((CurrencyOption option) => option.code == sourceCurrencyCode);
-      final String amountCurrencyCode = hasSupportedSourceCurrency
-          ? sourceCurrencyCode
-          : selectedCurrencyCode;
-      final double convertedAmount = amount > 0
-          ? CurrencyPreferenceController.instance.fromBaseAmount(
-              CurrencyPreferenceController.instance.toBaseAmount(
-                amount,
-                amountCurrencyCode,
-              ),
-              selectedCurrencyCode,
-            )
-          : amount;
-      final String category =
-          (parsed['aiCategory'] as String?)?.trim().isNotEmpty == true
-          ? (parsed['aiCategory'] as String).trim()
-          : 'General';
-      final String note = (parsed['note'] as String?)?.trim().isNotEmpty == true
-          ? (parsed['note'] as String).trim()
-          : 'Receipt scanned with AI.';
-      final String type = parsed['type']?.toString().toLowerCase() == 'income'
-          ? 'income'
-          : 'expense';
-
-      if (mounted) {
-        _uiState.setSelectedType(type);
-        _amountController.text = convertedAmount > 0
-            ? convertedAmount.toStringAsFixed(2)
-            : '';
-        _categoryController.text = category;
-        _noteController.text = note;
-      }
-
-      if (!mounted) {
-        return;
-      }
-
-      await NotificationService.instance.showNotification(
-        title: 'Receipt Ready',
-        body:
-            'Receipt details were extracted. Review and save this transaction.',
-        payload: NotificationService.payloadTransactions,
-      );
-    } catch (_) {
-      _showMessage(
-        'We could not process that receipt image. Please try another photo.',
-        isSuccess: false,
-      );
-    } finally {
-      if (mounted) {
-        _uiState.setAiUploading(false);
-      }
-    }
-  }
-
-  String _resolveMimeType(String filename) {
-    final String value = filename.toLowerCase();
-    if (value.endsWith('.png')) {
-      return 'image/png';
-    }
-    if (value.endsWith('.webp')) {
-      return 'image/webp';
-    }
-    if (value.endsWith('.gif')) {
-      return 'image/gif';
-    }
-
-    return 'image/jpeg';
-  }
 
   void _showMessage(String message, {required bool isSuccess}) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -236,28 +137,6 @@ class _AddTransactionViewState extends State<AddTransactionView> {
                             style: Theme.of(context).textTheme.bodyMedium
                                 ?.copyWith(color: onSurface.withOpacity(0.7)),
                           ),
-                          const SizedBox(height: 14),
-                          OutlinedButton.icon(
-                            onPressed:
-                                (uiState.isAiUploading || uiState.isSaving)
-                                ? null
-                                : _uploadReceiptAndAutoLog,
-                            icon: uiState.isAiUploading
-                                ? const SizedBox(
-                                    width: 16,
-                                    height: 16,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
-                                  )
-                                : const Icon(Icons.receipt_long_rounded),
-                            label: Text(
-                              uiState.isAiUploading
-                                  ? 'Processing receipt...'
-                                  : 'Upload Receipt with AI (Auto Fill)',
-                            ),
-                          ),
-                          const SizedBox(height: 20),
                           Form(
                             key: _formKey,
                             child: Column(
@@ -399,7 +278,6 @@ class _AddTransactionViewState extends State<AddTransactionView> {
 class _AddTransactionUiState extends ChangeNotifier {
   String selectedType = 'expense';
   bool isSaving = false;
-  bool isAiUploading = false;
 
   void setSelectedType(String value) {
     if (selectedType == value) {
@@ -416,15 +294,6 @@ class _AddTransactionUiState extends ChangeNotifier {
     }
 
     isSaving = value;
-    notifyListeners();
-  }
-
-  void setAiUploading(bool value) {
-    if (isAiUploading == value) {
-      return;
-    }
-
-    isAiUploading = value;
     notifyListeners();
   }
 }

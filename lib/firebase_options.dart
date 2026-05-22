@@ -60,12 +60,13 @@ class DefaultFirebaseOptions {
   );
 
   static FirebaseOptions get android => FirebaseOptions(
-    apiKey: _env('FIREBASE_ANDROID_API_KEY'),
-    appId: _env('FIREBASE_ANDROID_APP_ID'),
-    messagingSenderId: _env('FIREBASE_MESSAGING_SENDER_ID'),
-    projectId: _env('FIREBASE_PROJECT_ID'),
-    databaseURL: _env('FIREBASE_DATABASE_URL'),
-    storageBucket: _env('FIREBASE_STORAGE_BUCKET'),
+    apiKey: 'AIzaSyCgTQ9CpsXXkiFt9IVfXfTg59vg3HJndXo',
+    appId: '1:147458789912:android:47b49c177de17b52be696d',
+    messagingSenderId: '147458789912',
+    projectId: 'app-dev-70fc9',
+    databaseURL:
+        'https://app-dev-70fc9-default-rtdb.asia-southeast1.firebasedatabase.app',
+    storageBucket: 'app-dev-70fc9.firebasestorage.app',
   );
 
   static FirebaseOptions get ios => FirebaseOptions(

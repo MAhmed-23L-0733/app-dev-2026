@@ -14,7 +14,6 @@ class NotificationService {
 
   static const String payloadTransactions = 'transactions';
   static const String payloadGoals = 'goals';
-  static const String payloadChat = 'chat';
 
   Future<void> init() async {
     const AndroidInitializationSettings androidInit =
@@ -103,9 +102,6 @@ class NotificationService {
           ),
           (Route<dynamic> route) => false,
         );
-        break;
-      case payloadChat:
-        navigator.pushNamed('/chat');
         break;
       default:
         break;

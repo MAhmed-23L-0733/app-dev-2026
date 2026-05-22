@@ -1,8 +1,12 @@
 // ignore_for_file: deprecated_member_use
 
+import 'dart:async';
+
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'app_navigator.dart';
 import 'auth/signin.dart';
 import 'auth/signup.dart';
@@ -11,16 +15,58 @@ import 'services/notification_service.dart';
 import 'screens/main_wrapper.dart';
 import 'screens/splash_screen.dart'; // Added splash screen import
 import 'screens/transactions.dart'; // Added transactions screen import
-import 'screens/chat_view.dart'; // Added chat view import
 import 'theme_controller.dart';
 import 'widgets/neon_surface.dart';
 
 Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await dotenv.load(fileName: '.env');
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  await NotificationService.instance.init();
-  runApp(const MyApp());
+  // Catch all uncaught async errors so they never cause a silent black screen.
+  runZonedGuarded(
+    () async {
+      WidgetsFlutterBinding.ensureInitialized();
+
+      // Prevent google_fonts from downloading fonts at runtime.
+      // In release mode network fetches can fail and cause rendering issues.
+      GoogleFonts.config.allowRuntimeFetching = false;
+
+      // Surface Flutter framework errors even in release mode.
+      FlutterError.onError = (FlutterErrorDetails details) {
+        FlutterError.presentError(details);
+        debugPrint('FlutterError: ${details.exception}');
+      };
+
+      // --- dotenv ---
+      try {
+        await dotenv.load(fileName: '.env');
+      } catch (error) {
+        debugPrint('Failed to load .env: $error');
+      }
+
+      // --- Firebase ---
+      try {
+        await Firebase.initializeApp(
+          options: DefaultFirebaseOptions.currentPlatform,
+        );
+      } catch (error) {
+        debugPrint('Failed to initialize Firebase: $error');
+      }
+
+      // --- Notification service (deferred to avoid blocking runApp) ---
+      // We schedule this AFTER the first frame so a failure can never
+      // prevent the UI from appearing.
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        try {
+          await NotificationService.instance.init();
+        } catch (error) {
+          debugPrint('Failed to initialize NotificationService: $error');
+        }
+      });
+
+      runApp(const MyApp());
+    },
+    (Object error, StackTrace stack) {
+      debugPrint('Uncaught error: $error\n$stack');
+    },
+  );
 }
 
 class MyApp extends StatelessWidget {
@@ -61,7 +107,6 @@ class MyApp extends StatelessWidget {
             SignUpScreen.routeName: (_) => const SignUpScreen(),
             MainWrapperScreen.routeName: (_) => const MainWrapperScreen(),
             '/transactions': (_) => const _TransactionsScreenWrapper(),
-            '/chat': (_) => const ChatView(),
           },
         );
       },

@@ -25,6 +25,22 @@ class ProfileView extends StatelessWidget {
     );
   }
 
+  ButtonStyle _dialogCancelButtonStyle(BuildContext context) {
+    return OutlinedButton.styleFrom(
+      minimumSize: const Size(0, 40),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+    );
+  }
+
+  ButtonStyle _dialogSignOutButtonStyle(BuildContext context) {
+    return FilledButton.styleFrom(
+      backgroundColor: Colors.red.shade700,
+      foregroundColor: Colors.white,
+      minimumSize: const Size(0, 40),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final User? user = FirebaseAuth.instance.currentUser;
@@ -159,14 +175,17 @@ class ProfileView extends StatelessWidget {
               content: const Text(
                 'You will need to sign in again to access your account.',
               ),
+              actionsAlignment: MainAxisAlignment.end,
+              actionsOverflowButtonSpacing: 8,
               actions: <Widget>[
-                TextButton(
+                OutlinedButton(
                   onPressed: () => Navigator.of(dialogContext).pop(false),
+                  style: _dialogCancelButtonStyle(dialogContext),
                   child: const Text('Cancel'),
                 ),
-                ElevatedButton(
+                FilledButton(
                   onPressed: () => Navigator.of(dialogContext).pop(true),
-                  style: _signOutButtonStyle(dialogContext),
+                  style: _dialogSignOutButtonStyle(dialogContext),
                   child: const Text('Sign out'),
                 ),
               ],

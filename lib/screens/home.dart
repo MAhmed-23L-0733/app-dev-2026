@@ -3,12 +3,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 
 import '../auth/user_profile_service.dart';
 import '../services/currency_service.dart';
 import '../models/transaction.dart';
-import '../services/ai_expense_service.dart';
 import '../services/budget_firestore_service.dart';
 import '../widgets/neon_surface.dart';
 
@@ -191,18 +189,6 @@ class HomeView extends StatelessWidget {
                                               value,
                                             );
                                       },
-                                    ),
-                                    const SizedBox(height: 12),
-                                    SizedBox(
-                                      width: double.infinity,
-                                      child: OutlinedButton.icon(
-                                        onPressed: () =>
-                                            _showAiTextLogSheet(context),
-                                        icon: const Icon(Icons.auto_awesome),
-                                        label: const Text(
-                                          'Log from text with AI',
-                                        ),
-                                      ),
                                     ),
                                     const SizedBox(height: 18),
                                     Text(
@@ -582,171 +568,6 @@ String _monthLabel(DateTime value) {
   ];
 
   return '${months[value.month - 1]} ${value.year}';
-}
-
-Future<void> _showAiTextLogSheet(BuildContext context) async {
-  await showDialog<void>(
-    context: context,
-    builder: (BuildContext dialogContext) =>
-        _AiTextLogDialog(messenger: ScaffoldMessenger.maybeOf(context)),
-  );
-}
-
-class _AiTextLogDialog extends StatelessWidget {
-  const _AiTextLogDialog({required this.messenger});
-
-  final ScaffoldMessengerState? messenger;
-
-  @override
-  Widget build(BuildContext context) {
-    return ChangeNotifierProvider<_AiTextLogDialogUiState>(
-      create: (_) => _AiTextLogDialogUiState(),
-      child: _AiTextLogDialogBody(messenger: messenger),
-    );
-  }
-}
-
-class _AiTextLogDialogBody extends StatelessWidget {
-  const _AiTextLogDialogBody({required this.messenger});
-
-  final ScaffoldMessengerState? messenger;
-
-  void _showMessage(String message, {required bool isSuccess}) {
-    messenger?.showSnackBar(
-      SnackBar(
-        backgroundColor: isSuccess
-            ? Colors.green.shade700
-            : Colors.red.shade700,
-        content: Text(message),
-      ),
-    );
-  }
-
-  Future<void> _submit(
-    BuildContext context,
-    _AiTextLogDialogUiState uiState,
-  ) async {
-    final String userInput = uiState.controller.text.trim();
-    if (userInput.isEmpty) {
-      _showMessage(
-        'Please describe the transaction before continuing.',
-        isSuccess: false,
-      );
-      return;
-    }
-
-    uiState.setSubmitting(true);
-
-    try {
-      await AiExpenseService().logExpenseFromText(userInput);
-      if (context.mounted) {
-        Navigator.of(context).pop();
-      }
-      _showMessage('Transaction added successfully.', isSuccess: true);
-    } catch (error) {
-      if (context.mounted) {
-        uiState.setSubmitting(false);
-      }
-      _showMessage(
-        'We could not add that transaction right now. Please try again.',
-        isSuccess: false,
-      );
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final Color onSurface = Theme.of(context).colorScheme.onSurface;
-    return Consumer<_AiTextLogDialogUiState>(
-      builder: (BuildContext context, _AiTextLogDialogUiState uiState, _) {
-        return AlertDialog(
-          title: Text(
-            'Quick AI text log',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.w800,
-              color: onSurface,
-            ),
-          ),
-          content: SingleChildScrollView(
-            child: SizedBox(
-              width: 420,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: <Widget>[
-                  Text(
-                    'Describe your transaction in one sentence.',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: onSurface.withOpacity(0.72),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: uiState.controller,
-                    maxLines: 3,
-                    textInputAction: TextInputAction.done,
-                    decoration: const InputDecoration(
-                      hintText: 'Paid 1500 PKR for groceries at Imtiaz',
-                    ),
-                    onSubmitted: (_) {
-                      if (!uiState.isSubmitting) {
-                        _submit(context, uiState);
-                      }
-                    },
-                  ),
-                ],
-              ),
-            ),
-          ),
-          actions: <Widget>[
-            TextButton(
-              onPressed: uiState.isSubmitting
-                  ? null
-                  : () {
-                      Navigator.of(context).pop();
-                    },
-              child: const Text('Cancel'),
-            ),
-            FilledButton.icon(
-              onPressed: uiState.isSubmitting
-                  ? null
-                  : () => _submit(context, uiState),
-              icon: uiState.isSubmitting
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.send_rounded),
-              label: Text(
-                uiState.isSubmitting ? 'Logging...' : 'Log transaction',
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-}
-
-class _AiTextLogDialogUiState extends ChangeNotifier {
-  final TextEditingController controller = TextEditingController();
-  bool isSubmitting = false;
-
-  void setSubmitting(bool value) {
-    if (isSubmitting == value) {
-      return;
-    }
-
-    isSubmitting = value;
-    notifyListeners();
-  }
-
-  @override
-  void dispose() {
-    controller.dispose();
-    super.dispose();
-  }
 }
 
 class _MetricTile extends StatelessWidget {
