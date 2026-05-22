@@ -1,6 +1,6 @@
 {
-    "name": "appdev2026",
-    "short_name": "appdev2026",
+    "name": "SpendWise",
+    "short_name": "SpendWise",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
