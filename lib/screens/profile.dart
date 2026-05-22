@@ -138,7 +138,7 @@ class ProfileView extends StatelessWidget {
                               ),
                         ),
                         const SizedBox(height: 14),
-
+                        _SummaryRow(label: 'Sign-in method', value: provider),
                         const SizedBox(height: 12),
                         _SummaryRow(label: 'Joined', value: joined),
                         const SizedBox(height: 12),
