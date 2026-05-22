@@ -12,6 +12,14 @@ class GoogleAuthService {
   );
 
   Future<UserCredential> signInWithGoogle() async {
+    if (kIsWeb) {
+      final GoogleAuthProvider googleProvider = GoogleAuthProvider();
+      googleProvider.setCustomParameters({
+        'client_id': '147458789912-o5494sgmj8gt8k6r31ciphto5rvrag33.apps.googleusercontent.com'
+      });
+      return FirebaseAuth.instance.signInWithPopup(googleProvider);
+    }
+
     final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
     if (googleUser == null) {
       throw FirebaseAuthException(

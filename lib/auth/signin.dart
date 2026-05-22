@@ -123,9 +123,9 @@ class _SignInScreenState extends State<SignInScreen> {
           isSuccess: false,
         );
       }
-    } catch (_) {
+    } catch (e) {
       _showMessage(
-        'Google sign-in did not work. Please try again.',
+        'Google sign-in did not work. $e',
         isSuccess: false,
       );
     } finally {
